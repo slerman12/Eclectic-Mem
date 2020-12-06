@@ -1,55 +1,66 @@
 import torch
+import secrets
+from copy import copy
+from math import inf
 
 
 class Memory:
-    def __init__(self):
-        self.c = []
-        self.a = []
-        self.r = []
-        self.deltas = []
+    def __init__(self, N=inf, memories=None):
+        self.N = N
+
+        if memories is None:
+            self.n = 0
+            self.memories = {}
+        else:
+            self.memories = copy(memories)
+
+
+class MemoryUnit:
+    def __init__(self, concept, reward, action):
+        self.id = secrets.token_bytes()
+        self.c = concept
+        self.r = reward
+        self.a = action
+        self.futures = Memory()
+        self.pasts = Memory()
 
 
 class Agent:
-    def __init__(self, N, k, m, actions):
-        self.k = k
-        self.m = m
-        self.N = N
-        self.n = 0
-        self.i = 0
-        self.mem = Memory()
-        self.deltas = []
-        self.A = actions
+    def __init__(self, N, embed, delta, policy):
+        self.Memory = Memory(N)
+        self.M_t = Memory()
+        self.M_t_minus_1 = Memory()
 
-    def act(self, o_t):
+        self.embed = embed
+        self.delta = delta
+        self.policy = policy
+
+    def act(self, o_t, r_t):
+        new
         c_t = self.embed(o_t)
 
-        _K = self.mem.deltas[self.i][:self.k]
+        margin = 0.5
+        self.M_t = Memory(memories={m: self.M_t_minus_1.memories[m] for m in self.M_t_minus_1.futures()
+                                    if self.delta(c_t, self.M_t_minus_1.memories[m].c()) > margin})
 
-        delta_K = []
-        a_K = []
-        r_K = []
+        if len(self.M_t.memories) == 0:
+            self.M_t = self.traverse(self.M_t_minus_1,)
 
-        for l, _ in _K:
-            delta_K.append(self.delta(c_t, self.mem.c[l]))
-            a_K.append(self.mem.a[l])
-            r_K.append(self.mem.r[l])
+        self.M_t = self.update(self.M_t, c_t)
 
-            self.deltas.append((l, self.delta(c_t, self.mem.c[l])))
-            # todo maybe update m_deltas[i][l]
+        a_t = self.policy(c_t, self.M_t)
 
-        Q = []
-        for a in self.A:
-            Q_o_t_a = torch.sum(torch.nn.Softmax()(delta_K) * torch.tensor(r_K) * (torch.tensor(a_K) == a), dim=-1)
-            Q.append(Q_o_t_a)
+        if len(self.M_t.memories) == 0 or a_t not in self.M_t.a():
+            self.store(c_t, r_t, a_t)
 
 
-    def delta(self, o_t, o_t_plus_1):
-        # todo substitute with module
-        return 0
 
-    def embed(self, o_t):
-        # todo substitute with module
-        return 0
+    def store(self, c, r, a):
+        if self.n == self.N:
+            self.delete_LRA()
+        m = MemoryUnit(c, r, a)
+        self.Memory.add(m)
+        self.M_t.add(m)
 
     def learn(self):
 # todo contrastive learning
