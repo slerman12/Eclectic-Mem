@@ -79,12 +79,7 @@ class MemoryUnit:
 
 
 class Agent:
-    def __init__(self, N, embed, delta, policy, max_traversal_steps=inf, delta_margin=0.75):
-        self.Memory = Memory(N)
-        self.M_t = Memory()
-        self.M_t_minus_1 = Memory()
-        self.a_t_minus_1 = None
-
+    def __init__(self, embed, delta, policy, N=inf, max_traversal_steps=inf, delta_margin=0.75):
         # CNN
         self.embed = embed
         # Contrastive learning (perhaps with time-discounted probabilities)
@@ -92,9 +87,15 @@ class Agent:
         # Can be: attention over memories, NEC-style DQN, PPO, SAC, etc.
         self.policy = policy
 
+        self.Memory = Memory(N)
+        self.M_t = Memory()
+        self.M_t_minus_1 = Memory()
+        self.a_t_minus_1 = None
+
         self.max_traversal_steps = max_traversal_steps
         self.delta_margin = delta_margin
 
+    # Note: incompatible with batches
     def act(self, o_t, r_t):
         # Embedding/delta would ideally be recurrent and capture trajectory of at least two observations
         c_t = self.embed(o_t)
@@ -106,23 +107,12 @@ class Agent:
         new_connection = False
 
         if self.M_t.n == 0:
+            # Find similar memories
             self.traverse(c_t)
             new_connection = True
 
-        # Merge memories that delta deems "the same"
-        # Note: maybe memories with different rewards should be kept unmerged
-        # Note: if action is a tensor, python might not be able to use it as key
-        actions = {}
-        for m in self.M_t.memories.values():
-            m.concept = c_t
-            if m.action in actions:
-                m.reward = max(m.reward, actions[m.action])
-                m.access_time = max(m.access_time, actions[m.action].access_time)
-                # TODO can be made slightly more efficient by iterating merge and remove together
-                m.merge(actions[m.action])
-                self.Memory.remove(actions[m.action])
-                self.M_t.remove(actions[m.action], de_reference=False)
-            actions[m.action] = m
+        # Merge memories that delta deems "the same" by action
+        actions = self.merge_M_t_by_action(c_t)
 
         a_t = self.policy(c_t, self.M_t).sample()
 
@@ -178,6 +168,22 @@ class Agent:
                 current_positions.remove(m, de_reference=False)
             max_delta = new_max_delta
         # TODO in rare cases, can also do full lookup
+
+    def merge_M_t_by_action(self, concept):
+        # Note: maybe memories with different rewards should be kept unmerged
+        # Note: if action is a tensor, python might not be able to use it as key
+        actions = {}
+        for m in self.M_t.memories.values():
+            m.concept = concept
+            if m.action in actions:
+                m.reward = max(m.reward, actions[m.action])
+                m.access_time = max(m.access_time, actions[m.action].access_time)
+                # TODO can be made slightly more efficient by iterating merge and remove together
+                m.merge(actions[m.action])
+                self.Memory.remove(actions[m.action])
+                self.M_t.remove(actions[m.action], de_reference=False)
+            actions[m.action] = m
+        return actions
 
     def learn(self, trajectories):
         self.delta.train(trajectories)
