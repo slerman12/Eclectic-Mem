@@ -16,71 +16,48 @@ class Memory:
         if isinstance(memories, MemoryUnit):
             memories = [memories]
 
-        for m in memories:
-            if m not in self:
+        for memory in memories:
+            if memory not in self:
                 if self.n == self.N:
                     self.remove(self.get_LRA())
 
-                self.memories[m.id] = m
+                self.memories[memory.id] = memory
                 self.n += 1
 
     def remove(self, memory, de_reference=True):
-        del self.memories[memory.id]
-        if de_reference:
-            for m in memory.futures.get_memories():
-                m.pasts.remove(memory, de_reference=False)
-            for m in memory.pasts.get_memories():
-                m.futures.remove(memory, de_reference=False)
-        self.n -= 1
+        if memory in self:
+            del self.memories[memory.id]
+            if de_reference:
+                for future in memory.futures.get_memories():
+                    future.pasts.remove(memory, de_reference=False)
+                for past in memory.pasts.get_memories():
+                    past.futures.remove(memory, de_reference=False)
+            self.n -= 1
 
-    def retrieve(self, ids):
-        if isinstance(ids, (list, set)):
-            return [self.memories[ID] for ID in ids]
-        else:
-            return self.memories[ids]
-        
     def get_memories(self):
         return self.memories.values()
-
-    def get_futures(self):
-        futures = Memory()
-        for m in self.get_memories():
-            futures.add(m.futures)
-        return futures.get_memories()
-
-    def get_memory_by_action(self, action):
-        # TODO can do faster by indexing by action
-        for m in self.get_memories():
-            if m.action == action:
-                return m
 
     def get_LRA(self):
         # Least recently accessed memory
         # TODO can make much faster by keeping cache of memories sorted by access time
-        return min(self.get_memories(), key=lambda m: m.access_time)
+        return min(self.get_memories(), key=lambda memory: memory.access_time)
 
-    def __add__(self, memories):
-        assert isinstance(memories, Memory)
-        summed = Memory()
-        summed.memories.update(self.memories)
-        summed.memories.update(memories.memories)
-        summed.n = len(summed.memories)
-        return summed
-    
     def __contains__(self, memory):
         assert isinstance(memory, MemoryUnit)
         return memory.id in self.memories
 
 
 class MemoryUnit:
-    def __init__(self, concept, reward, action, access_time=None):
+    def __init__(self, concept, reward, action, access_time=None, terminal=False):
         self.id = secrets.token_bytes()
         self.concept = concept
         self.reward = reward
         self.action = action
+        self.access_time = time.time() if access_time is None else access_time
+        self.terminal = terminal
         self.futures = Memory()
         self.pasts = Memory()
-        self.access_time = time.time() if access_time is None else access_time
+        self.future_discounted_reward = -inf
 
     def merge(self, memory):
         self.futures.memories.update(memory.futures.memories)
@@ -97,10 +74,10 @@ class TrajectoryHead:
     def __init__(self):
         self.units = {}
         self.memories = Memory()
-        self.data = None
+        self.trace = None
         self.action_unit = None
         self.n = 0
-        
+
     def add(self, unit, past=None):
         if unit not in self:
             if isinstance(unit, MemoryUnit):
@@ -113,37 +90,40 @@ class TrajectoryHead:
             assert isinstance(past, TrajectoryUnit)
             self.units[unit.id].pasts.add(past)
         self.n = self.memories.n
-            
+
     def get_units(self):
         return self.units.values()
-        
+
     def get_memories(self):
         return self.memories.get_memories()
-            
+
     def __contains__(self, unit):
         return unit.id in self.units
-    
+
 
 class TrajectoryUnit:
     def __init__(self, memory):
         self.id = memory.id
         self.memory = memory
         self.pasts = TrajectoryHead()
-        self.data = None
+        self.trace = None
 
 
-class Data:
-    def __init__(self, observation, concept, reward, action, access_time, past_data):
+class Trace:
+    def __init__(self, observation, concept, reward, action, memories, access_time, past_trace, terminal=False):
         self.observation = observation
         self.concept = concept
         self.reward = reward
         self.action = action
+        self.memories = memories
         self.access_time = access_time
-        self.past_data = past_data
-        
+        self.past_trace = past_trace
+        self.future_discounted_reward = None
+        self.terminal = terminal
+
 
 class Agent:
-    def __init__(self, embed, delta, policy, N=inf, max_traversal_steps=inf, delta_margin=0.75, T=inf):
+    def __init__(self, embed, delta, policy, N=inf, max_traversal_steps=inf, delta_margin=0.75, T=inf, gamma=1):
         # CNN
         self.embed = embed
         # Contrastive learning (perhaps with time-discounted probabilities)
@@ -153,13 +133,25 @@ class Agent:
 
         self.Memory = Memory(N)
         self.Head = TrajectoryHead()
+        self.Traces = []
 
         self.max_traversal_steps = max_traversal_steps
         self.delta_margin = delta_margin
+        # Reward time horizon
         self.T = T
+        # Reward discount factor
+        self.gamma = gamma
 
     # Note: incompatible with batches
     def act(self, o_t, r_t):
+        return self.update(o_t, r_t)
+
+    # Note: incompatible with batches
+    def add_terminal(self, o_t, r_t):
+        return self.update(o_t, r_t, terminal=True)
+
+    # Note: incompatible with batches
+    def update(self, o_t, r_t, terminal=False):
         # Embedding/delta would ideally be recurrent and capture trajectory of at least two observations
         c_t = self.embed(o_t)
 
@@ -179,21 +171,21 @@ class Agent:
         # Merge memories that delta deems "the same" by action
         actions = self.merge_memories_by_action(new_head, c_t)
 
-        a_t = self.policy(c_t, new_head.memories).sample()
+        a_t = "terminal" if terminal else self.policy(c_t, new_head.memories).sample()
 
         if a_t in actions:
             new_head.action_unit = actions[a_t]
         else:
             # Store memory
-            m = MemoryUnit(c_t, r_t, a_t, access_time)
+            m = MemoryUnit(c_t, r_t, a_t, access_time, terminal)
             self.Memory.add(m)
             # Create new connection
             self.connect_memory(new_head, m)
             new_head.action_unit = new_head.units[m.id]
 
-        new_head.data = Data(o_t, c_t, r_t, a_t, access_time, self.Head.data)
-
-        self.Head = new_head  # If terminal, reset
+        new_head.trace = Trace(o_t, c_t, r_t, a_t, new_head.memories, access_time, self.Head.trace, terminal=terminal)
+        self.Traces.append(new_head.trace)
+        self.Head = TrajectoryHead() if terminal else new_head
 
         return a_t
 
@@ -247,9 +239,14 @@ class Agent:
             actions[m.action] = m
         return actions
 
-    def learn(self, trajectories):
-        self.delta.train(trajectories)
-        self.policy.train(trajectories)
+    def add_terminal(self, o_t, r_t):
+
+    def propogate_rewards(self):
+
+    def learn(self):
+        self.delta.train(self.Traces)
+        self.policy.train(self.Traces)
+        self.Traces = []
 
 
 
