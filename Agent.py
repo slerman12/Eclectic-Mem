@@ -121,6 +121,7 @@ class Agent:
                 # TODO can be made slightly more efficient by iterating merge and remove together
                 m.merge(actions[m.action])
                 self.Memory.remove(actions[m.action])
+                self.M_t.remove(actions[m.action], de_reference=False)
             actions[m.action] = m
 
         a_t = self.policy(c_t, self.M_t).sample()
@@ -178,9 +179,9 @@ class Agent:
             max_delta = new_max_delta
         # TODO in rare cases, can also do full lookup
 
-    def learn(self, trajectory):
-        self.delta.train(trajectory)
-        self.policy.train(trajectory)
+    def learn(self, trajectories):
+        self.delta.train(trajectories)
+        self.policy.train(trajectories)
 
 
 
