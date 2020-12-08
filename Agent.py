@@ -101,20 +101,28 @@ class TrajectoryHead:
 
     # def get_memories(self):
     #     return self.memories.get_memories()
+    def set_trace(self, trace):
+        self.trace = trace
+        for unit in self.units.values():
+            unit.trace = trace
 
     def __contains__(self, unit):
         return unit.id in self.units
 
-    def propogate_reward(self, running_future_discounted_reward=0):
+    def propogate_reward(self, running_future_discounted_reward=0, steps=0):
         propogated = {}
-        for unit in self.get_units():
-            future_discounted_reward = unit.trace.reward + self.gamma * running_future_discounted_reward
-            unit.trace.future_discounted_reward = future_discounted_reward
-            unit.memory.future_discounted_reward = max(future_discounted_reward, unit.memory.future_discounted_reward)
-            for past in unit.pasts.get_units():
-                if past.id not in propogated:
-                    propogated.update(past.id)
-                    past.propogate_reward(future_discounted_reward)
+        steps += 1
+        if steps <= self.T:
+            for unit in self.get_units():
+                future_discounted_reward = unit.trace.reward + self.gamma * running_future_discounted_reward
+                unit.trace.future_discounted_reward = future_discounted_reward
+                unit.memory.future_discounted_reward = max(future_discounted_reward, unit.memory.future_discounted_reward)
+                for past in unit.pasts.get_units():
+                    if past.id not in propogated:
+                        propogated.update(past.id)
+                        past.propogate_reward(future_discounted_reward, steps)
+                if steps == 1:
+                    unit.pasts = TrajectoryHead()
 
 
 class TrajectoryUnit:
@@ -126,14 +134,13 @@ class TrajectoryUnit:
 
 
 class Trace:
-    def __init__(self, observation, concept, reward, action, memories, access_time, past_trace, terminal=False):
+    def __init__(self, observation, concept, reward, action, memories, access_time, terminal=False):
         self.observation = observation
         self.concept = concept
         self.reward = reward
         self.action = action
         self.memories = memories
         self.access_time = access_time
-        self.past_trace = past_trace
         self.future_discounted_reward = None
         self.terminal = terminal
 
@@ -153,6 +160,10 @@ class Agent:
 
         self.max_traversal_steps = max_traversal_steps
         self.delta_margin = delta_margin
+        # Reward time horizon
+        self.T = T
+        # Reward discount factor
+        self.gamma = gamma
 
     # Note: incompatible with batches
     def act(self, o_t, r_t):
@@ -196,7 +207,7 @@ class Agent:
             self.connect_memory(new_head, m, access_time)
             new_head.action_unit = new_head.units[m.id]
 
-        new_head.trace = Trace(o_t, c_t, r_t, a_t, new_head.memories, access_time, self.Head.trace, terminal=terminal)
+        new_head.set_trace(Trace(o_t, c_t, r_t, a_t, new_head.memories, access_time, terminal=terminal))
         self.Traces.append(new_head.trace)
         self.Head = TrajectoryHead() if terminal else new_head
 
@@ -256,7 +267,9 @@ class Agent:
     def learn(self):
         self.delta.train(self.Traces)
         self.policy.train(self.Traces)
+        self.Head = TrajectoryHead(self.T, self.gamma)
         self.Traces = []
+
 
 
 
