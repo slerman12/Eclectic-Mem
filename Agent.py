@@ -2,6 +2,7 @@ import secrets
 import time
 from copy import copy
 from math import inf
+from random import random
 
 
 class Memory:
@@ -14,13 +15,16 @@ class Memory:
         assert isinstance(memory, MemoryUnit)
         return memory.id in self.memories
 
+    def __add__(self, memories):
+        return type(self)().add(self).add(memories)
+
     def add(self, memories):
         if isinstance(memories, Memory):
-            self.memories.update(memories.memories)
-            self.n = len(self.memories)
-            assert self.n <= self.N
-            return
-            # memories = memories.get_memories()
+            if self.n + memories.n <= self.N:
+                self.memories.update(memories.memories)
+                self.n = len(self.memories)
+                return self
+            memories = memories.get_memories()
 
         if isinstance(memories, MemoryUnit):
             memories = [memories]
@@ -32,6 +36,8 @@ class Memory:
 
                 self.memories[memory.id] = memory
                 self.n += 1
+
+        return self
 
     def remove(self, memory, de_reference=True):
         if memory in self:
@@ -134,6 +140,7 @@ class TrajectoryHead:
             if future_discounted_reward is None:
                 future_discounted_reward = unit.trace.r + self.gamma * running_future_discounted_reward
                 unit.trace.future_discounted_reward = future_discounted_reward
+            # Note: maybe should do weighted avg instead of always taking max
             unit.memory.future_discounted_reward = max(future_discounted_reward, unit.memory.future_discounted_reward)
             if steps < self.T:
                 unit.pasts.propogate_reward(future_discounted_reward, steps, pasts_propogated)
@@ -186,13 +193,17 @@ class Agent:
         self.delta_margin = delta_margin
 
     # Note: incompatible with batches
-    def act(self, o_t, r_t):
-        a_t, _ = self.update(o_t, r_t)
+    def act(self, o_t, r_t, propogate_reward=True):
+        a_t, head = self.update(o_t, r_t)
+        if propogate_reward:
+            head.propogate_reward()
         return a_t
 
     # Note: incompatible with batches
-    def add_terminal(self, o_t, r_t):
-        return self.update(o_t, r_t, terminal=True)
+    def add_terminal(self, o_t, r_t, propogate_reward=True):
+        _, head = self.update(o_t, r_t, terminal=True)
+        if propogate_reward:
+            head.propogate_reward()
 
     # Note: incompatible with batches
     def update(self, o_t, r_t, terminal=False):
@@ -202,15 +213,17 @@ class Agent:
         access_time = time.time()
 
         new_head = TrajectoryHead(self.Head.T, self.Head.gamma)
+        futures = Memory()
         for u in self.Head.get_units():
             for m_future in u.memory.futures.get_memories():
+                futures.add(m_future)
                 if self.delta(c_t, m_future.concept) >= self.delta_margin:
                     new_head.add(m_future, u)
                     m_future.access_time = access_time
 
-        # If existing connections do not yield similar memories, traverse to find similar memories
+        # If existing connections do not yield similar memories, traverse to find similar memories; make new connections
         if new_head.n == 0:
-            self.traverse(new_head, c_t, access_time)
+            self.traverse(new_head, c_t, access_time, current_positions=futures, explored=futures)
 
         # Merge memories that delta deems "the same" by action
         actions = self.merge_memories_by_action(new_head, c_t)
@@ -242,31 +255,25 @@ class Agent:
             new_head.add(memory, past_unit)
             memory.access_time = access_time
 
-    def traverse(self, new_head, concept, access_time):
-        steps = 0
-        max_delta = 0
-        current_positions = Memory()
-        current_positions.add(self.M_t_minus_1)
-        explored = Memory()
-        while steps < self.max_traversal_steps:
-            if current_positions.n == 0:
-                break
-            new_max_delta = max_delta
-            for m in current_positions.get_memories():
-                if m.id not in explored.memories:
-                    delta = self.delta(concept, m.concept)
-                    if delta >= self.delta_margin:
-                        # Create new connection
-                        self.connect_memory(new_head, m, access_time)
-                    if delta > max_delta:
-                        new_max_delta = min(delta, self.delta_margin)
-                        current_positions.add(m.futures)
-                        current_positions.add(m.pasts)
-                    explored.add(m)
-                    steps += 1
-                current_positions.remove(m, de_reference=False)
-            max_delta = new_max_delta
-        # TODO in rare cases, can also do full lookup
+    def traverse(self, new_head, concept, access_time, current_positions, explored, steps=0, max_delta=-inf):
+        for m in current_positions.get_memories():
+            if steps == self.max_traversal_steps or steps == self.Memory.n:
+                return
+            if m not in explored:
+                steps += 1
+                explored.add(m)
+                delta = self.delta(concept, m.concept)
+                if delta >= self.delta_margin:
+                    # Create new connection
+                    self.connect_memory(new_head, m, access_time)
+                    continue
+                if delta >= max_delta:
+                    self.traverse(new_head, concept, access_time, m.futures + m.pasts, explored, steps, delta)
+
+        # TODO extremely inefficient! O(N) w.r.t. memory because of the list conversion. Can be made O(1)!
+        # sampled = Memory().add(random.sample(list(self.Memory.memories.items())))
+        # self.traverse(new_head, concept, access_time, sampled, explored, steps, -inf)
+        self.traverse(new_head, concept, access_time, self.Memory, explored, steps, self.delta_margin)
 
     def merge_memories_by_action(self, new_head, concept):
         # Note: maybe memories with different rewards/future-discounted-rewards should be kept unmerged
@@ -276,8 +283,10 @@ class Agent:
         for u in new_head.get_units():
             u.memory.concept = concept
             if u.memory.action in actions:
+                # Note: taking max instead of using a learning rule e.g. weighted avg
                 u.memory.reward = max(u.memory.reward, actions[u.memory.action].reward)
-                u.memory.future_discounted_reward = max(u.memory.future_discounted_reward, actions[u.memory.action].future_discounted_reward)
+                u.memory.future_discounted_reward = max(u.memory.future_discounted_reward,
+                                                        actions[u.memory.action].future_discounted_reward)
                 u.memory.access_time = max(u.memory.access_time, actions[u.memory.action].access_time)
 
                 # TODO can be made slightly more efficient by iterating merge and remove together
@@ -293,10 +302,3 @@ class Agent:
         self.delta.train(self.Traces)
         self.policy.train(self.Traces)
         self.Traces = []
-
-
-
-
-
-
-
