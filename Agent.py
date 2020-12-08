@@ -1,5 +1,6 @@
 import secrets
 import time
+from copy import copy
 from math import inf
 
 
@@ -15,7 +16,11 @@ class Memory:
 
     def add(self, memories):
         if isinstance(memories, Memory):
-            memories = memories.get_memories()
+            self.memories.update(memories.memories)
+            self.n = len(self.memories)
+            assert self.n <= self.N
+            return
+            # memories = memories.get_memories()
 
         if isinstance(memories, MemoryUnit):
             memories = [memories]
@@ -59,11 +64,10 @@ class MemoryUnit:
         self.pasts = Memory()
         self.future_discounted_reward = -inf
 
-    def merge(self, memory):
-        self.futures.memories.update(memory.futures.memories)
-        self.futures.n = len(self.futures.memories)
-        self.pasts.memories.update(memory.pasts.memories)
-        self.pasts.n = len(self.pasts.memories)
+    def merge_connections(self, memory):
+        # Merge futures/pasts with another memory
+        self.futures.add(memory.futures)
+        self.pasts.add(memory.pasts)
         for m in memory.futures.get_memories():
             m.pasts.add(self)
         for m in memory.pasts.get_memories():
@@ -92,7 +96,7 @@ class TrajectoryHead:
         if unit not in self:
             if isinstance(unit, MemoryUnit):
                 self.memories.add(unit)
-                self.units[unit.id] = TrajectoryUnit(unit)
+                self.units[unit.id] = TrajectoryUnit(unit, self.T, self.gamma)
             elif isinstance(unit, TrajectoryUnit):
                 self.memories.add(unit.memory)
                 self.units[unit.id] = unit
@@ -100,6 +104,13 @@ class TrajectoryHead:
             assert isinstance(past, TrajectoryUnit)
             self.units[unit.id].pasts.add(past)
         self.n = self.memories.n
+
+    def remove(self, unit):
+        if unit in self:
+            memory = self.units[unit.id].memory
+            del self.units[unit.id]
+            self.memories.remove(memory, de_reference=False)
+            self.n -= 1
 
     def get_units(self):
         return self.units.values()
@@ -112,30 +123,38 @@ class TrajectoryHead:
         for unit in self.units.values():
             unit.trace = trace
 
-    def propogate_reward(self, running_future_discounted_reward=0, steps=0):
-        propogated = {}
-        steps += 1
+    def propogate_reward(self, running_future_discounted_reward=0, steps=0, propogated=None):
+        if propogated is None:
+            propogated = {}
         future_discounted_reward = None
-        for unit in self.get_units():
+        steps += 1
+        pasts_propogated = {}
+        for unit in [self.units[ID] for ID in self.units if ID not in propogated]:
+            propogated.update(unit.id)
             if future_discounted_reward is None:
                 future_discounted_reward = unit.trace.r + self.gamma * running_future_discounted_reward
                 unit.trace.future_discounted_reward = future_discounted_reward
             unit.memory.future_discounted_reward = max(future_discounted_reward, unit.memory.future_discounted_reward)
             if steps < self.T:
-                for past in unit.pasts.get_units():
-                    if past.id not in propogated:
-                        propogated.update(past.id)
-                        past.propogate_reward(future_discounted_reward, steps)
+                unit.pasts.propogate_reward(future_discounted_reward, steps, pasts_propogated)
             else:
-                unit.pasts = TrajectoryHead()
+                unit.pasts = TrajectoryHead(self.T, self.gamma)
 
 
 class TrajectoryUnit:
-    def __init__(self, memory):
+    def __init__(self, memory, T=inf, gamma=1):
         self.id = memory.id
         self.memory = memory
-        self.pasts = TrajectoryHead()
+        self.pasts = TrajectoryHead(T, gamma)
         self.trace = None
+
+    def merge_connections(self, unit):
+        # Merge pasts and memory futures/pasts with another unit
+        assert isinstance(unit, TrajectoryUnit)
+        self.pasts.units.update(unit.pasts.units)
+        self.pasts.memories.add(unit.pasts.memories)
+        self.pasts.n = self.pasts.memories.n
+        self.memory.merge_connections(unit.memory)
 
 
 class Trace:
@@ -182,7 +201,7 @@ class Agent:
 
         access_time = time.time()
 
-        new_head = TrajectoryHead()
+        new_head = TrajectoryHead(self.Head.T, self.Head.gamma)
         for u in self.Head.get_units():
             for m_future in u.memory.futures.get_memories():
                 if self.delta(c_t, m_future.concept) >= self.delta_margin:
@@ -208,9 +227,9 @@ class Agent:
             self.connect_memory(new_head, m, access_time)
             new_head.action_unit = new_head.units[m.id]
 
-        new_head.set_trace(Trace(o_t, c_t, r_t, a_t, new_head.memories, access_time, terminal=terminal))
+        new_head.set_trace(Trace(o_t, c_t, r_t, a_t, [copy(m) for m in new_head.get_memories()], access_time, terminal))
         self.Traces.append(new_head.trace)
-        self.Head = TrajectoryHead() if terminal else new_head
+        self.Head = TrajectoryHead(self.Head.T, self.Head.gamma) if terminal else new_head
 
         return a_t, new_head
 
@@ -253,16 +272,21 @@ class Agent:
         # Note: maybe memories with different rewards/future-discounted-rewards should be kept unmerged
         # Note: if action is a tensor, python might not be able to use it as key
         actions = {}
-        for m in self.M_t.get_memories():
-            m.concept = concept
-            if m.a in actions:
-                m.r = max(m.r, actions[m.a])
-                m.access_time = max(m.access_time, actions[m.a].access_time)
+
+        for u in new_head.get_units():
+            u.memory.concept = concept
+            if u.memory.action in actions:
+                u.memory.reward = max(u.memory.reward, actions[u.memory.action].reward)
+                u.memory.future_discounted_reward = max(u.memory.future_discounted_reward, actions[u.memory.action].future_discounted_reward)
+                u.memory.access_time = max(u.memory.access_time, actions[u.memory.action].access_time)
+
                 # TODO can be made slightly more efficient by iterating merge and remove together
-                m.merge(actions[m.a])
-                self.Memory.remove(actions[m.a])
-                self.M_t.remove(actions[m.a], de_reference=False)
-            actions[m.a] = m
+                u.merge_connections(actions[u.memory.action])
+                self.Memory.remove(actions[u.memory.action].memory)
+                new_head.remove(actions[u.memory.action])
+
+            actions[u.memory.action] = u
+
         return actions
 
     def learn(self):
