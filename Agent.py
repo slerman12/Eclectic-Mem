@@ -71,12 +71,17 @@ class MemoryUnit:
 
 
 class TrajectoryHead:
-    def __init__(self):
+    def __init__(self, T=inf, gamma=1):
         self.units = {}
         self.memories = Memory()
         self.trace = None
         self.action_unit = None
         self.n = 0
+
+        # Reward time horizon
+        self.T = T
+        # Reward discount factor
+        self.gamma = gamma
 
     def add(self, unit, past=None):
         if unit not in self:
@@ -94,11 +99,22 @@ class TrajectoryHead:
     def get_units(self):
         return self.units.values()
 
-    def get_memories(self):
-        return self.memories.get_memories()
+    # def get_memories(self):
+    #     return self.memories.get_memories()
 
     def __contains__(self, unit):
         return unit.id in self.units
+
+    def propogate_reward(self, running_future_discounted_reward=0):
+        propogated = {}
+        for unit in self.get_units():
+            future_discounted_reward = unit.trace.reward + self.gamma * running_future_discounted_reward
+            unit.trace.future_discounted_reward = future_discounted_reward
+            unit.memory.future_discounted_reward = max(future_discounted_reward, unit.memory.future_discounted_reward)
+            for past in unit.pasts.get_units():
+                if past.id not in propogated:
+                    propogated.update(past.id)
+                    past.propogate_reward(future_discounted_reward)
 
 
 class TrajectoryUnit:
@@ -132,19 +148,16 @@ class Agent:
         self.policy = policy
 
         self.Memory = Memory(N)
-        self.Head = TrajectoryHead()
+        self.Head = TrajectoryHead(T, gamma)
         self.Traces = []
 
         self.max_traversal_steps = max_traversal_steps
         self.delta_margin = delta_margin
-        # Reward time horizon
-        self.T = T
-        # Reward discount factor
-        self.gamma = gamma
 
     # Note: incompatible with batches
     def act(self, o_t, r_t):
-        return self.update(o_t, r_t)
+        a_t, _ = self.update(o_t, r_t)
+        return a_t
 
     # Note: incompatible with batches
     def add_terminal(self, o_t, r_t):
@@ -166,7 +179,7 @@ class Agent:
 
         # If existing connections do not yield similar memories, traverse to find similar memories
         if new_head.n == 0:
-            self.traverse(new_head, c_t)
+            self.traverse(new_head, c_t, access_time)
 
         # Merge memories that delta deems "the same" by action
         actions = self.merge_memories_by_action(new_head, c_t)
@@ -180,24 +193,25 @@ class Agent:
             m = MemoryUnit(c_t, r_t, a_t, access_time, terminal)
             self.Memory.add(m)
             # Create new connection
-            self.connect_memory(new_head, m)
+            self.connect_memory(new_head, m, access_time)
             new_head.action_unit = new_head.units[m.id]
 
         new_head.trace = Trace(o_t, c_t, r_t, a_t, new_head.memories, access_time, self.Head.trace, terminal=terminal)
         self.Traces.append(new_head.trace)
         self.Head = TrajectoryHead() if terminal else new_head
 
-        return a_t
+        return a_t, new_head
 
-    def connect_memory(self, new_head, memory):
+    def connect_memory(self, new_head, memory, access_time):
         if self.Head.action_unit is not None:
             # Update memory futures/pasts
             past_unit = self.Head.action_unit
             past_unit.memory.futures.add(memory)
             memory.pasts.add(past_unit.memory)
             new_head.add(memory, past_unit)
+            memory.access_time = access_time
 
-    def traverse(self, new_head, concept):
+    def traverse(self, new_head, concept, access_time):
         steps = 0
         max_delta = 0
         current_positions = Memory()
@@ -212,7 +226,7 @@ class Agent:
                     delta = self.delta(concept, m.concept)
                     if delta >= self.delta_margin:
                         # Create new connection
-                        self.connect_memory(new_head, m)
+                        self.connect_memory(new_head, m, access_time)
                     if delta > max_delta:
                         new_max_delta = min(delta, self.delta_margin)
                         current_positions.add(m.futures)
@@ -238,10 +252,6 @@ class Agent:
                 self.M_t.remove(actions[m.action], de_reference=False)
             actions[m.action] = m
         return actions
-
-    def add_terminal(self, o_t, r_t):
-
-    def propogate_rewards(self):
 
     def learn(self):
         self.delta.train(self.Traces)
