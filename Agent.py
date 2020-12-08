@@ -112,17 +112,17 @@ class TrajectoryHead:
     def propogate_reward(self, running_future_discounted_reward=0, steps=0):
         propogated = {}
         steps += 1
-        if steps <= self.T:
-            for unit in self.get_units():
-                future_discounted_reward = unit.trace.reward + self.gamma * running_future_discounted_reward
-                unit.trace.future_discounted_reward = future_discounted_reward
-                unit.memory.future_discounted_reward = max(future_discounted_reward, unit.memory.future_discounted_reward)
+        for unit in self.get_units():
+            future_discounted_reward = unit.trace.reward + self.gamma * running_future_discounted_reward
+            unit.trace.future_discounted_reward = future_discounted_reward
+            unit.memory.future_discounted_reward = max(future_discounted_reward, unit.memory.future_discounted_reward)
+            if steps < self.T:
                 for past in unit.pasts.get_units():
                     if past.id not in propogated:
                         propogated.update(past.id)
                         past.propogate_reward(future_discounted_reward, steps)
-                if steps == 1:
-                    unit.pasts = TrajectoryHead()
+            else:
+                unit.pasts = TrajectoryHead()
 
 
 class TrajectoryUnit:
@@ -160,10 +160,6 @@ class Agent:
 
         self.max_traversal_steps = max_traversal_steps
         self.delta_margin = delta_margin
-        # Reward time horizon
-        self.T = T
-        # Reward discount factor
-        self.gamma = gamma
 
     # Note: incompatible with batches
     def act(self, o_t, r_t):
@@ -267,7 +263,6 @@ class Agent:
     def learn(self):
         self.delta.train(self.Traces)
         self.policy.train(self.Traces)
-        self.Head = TrajectoryHead(self.T, self.gamma)
         self.Traces = []
 
 
