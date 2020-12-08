@@ -2,7 +2,6 @@ import secrets
 import time
 from copy import copy
 from math import inf
-from random import random
 
 
 class Memory:
@@ -213,17 +212,20 @@ class Agent:
         access_time = time.time()
 
         new_head = TrajectoryHead(self.Head.T, self.Head.gamma)
-        futures = Memory()
+        current_positions = Memory()
+        explored = Memory()
         for u in self.Head.get_units():
             for m_future in u.memory.futures.get_memories():
-                futures.add(m_future)
+                explored.add(m_future)
+                current_positions.add(m_future.futures)
+                current_positions.add(m_future.pasts)
                 if self.delta(c_t, m_future.concept) >= self.delta_margin:
                     new_head.add(m_future, u)
                     m_future.access_time = access_time
 
         # If existing connections do not yield similar memories, traverse to find similar memories; make new connections
         if new_head.n == 0:
-            self.traverse(new_head, c_t, access_time, current_positions=futures, explored=futures)
+            self.traverse(new_head, c_t, access_time, current_positions=current_positions, explored=explored)
 
         # Merge memories that delta deems "the same" by action
         actions = self.merge_memories_by_action(new_head, c_t)
@@ -255,25 +257,23 @@ class Agent:
             new_head.add(memory, past_unit)
             memory.access_time = access_time
 
-    def traverse(self, new_head, concept, access_time, current_positions, explored, steps=0, max_delta=-inf):
+    def traverse(self, new_head, concept, access_time, current_positions, explored, max_delta=-inf):
         for m in current_positions.get_memories():
-            if steps == self.max_traversal_steps or steps == self.Memory.n:
+            if explored.n == self.max_traversal_steps or explored.n == self.Memory.n:
                 return
             if m not in explored:
-                steps += 1
                 explored.add(m)
                 delta = self.delta(concept, m.concept)
                 if delta >= self.delta_margin:
                     # Create new connection
                     self.connect_memory(new_head, m, access_time)
+                    max_delta = self.delta_margin
                     continue
                 if delta >= max_delta:
-                    self.traverse(new_head, concept, access_time, m.futures + m.pasts, explored, steps, delta)
+                    self.traverse(new_head, concept, access_time, m.futures + m.pasts, explored, delta)
 
-        # TODO extremely inefficient! O(N) w.r.t. memory because of the list conversion. Can be made O(1)!
-        # sampled = Memory().add(random.sample(list(self.Memory.memories.items())))
-        # self.traverse(new_head, concept, access_time, sampled, explored, steps, -inf)
-        self.traverse(new_head, concept, access_time, self.Memory, explored, steps, self.delta_margin)
+        # TODO should be randomly shuffled Memory
+        return self.traverse(new_head, concept, access_time, self.Memory, explored, max_delta)
 
     def merge_memories_by_action(self, new_head, concept):
         # Note: maybe memories with different rewards/future-discounted-rewards should be kept unmerged
