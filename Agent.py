@@ -9,6 +9,10 @@ class Memory:
         self.n = 0
         self.memories = {}
 
+    def __contains__(self, memory):
+        assert isinstance(memory, MemoryUnit)
+        return memory.id in self.memories
+
     def add(self, memories):
         if isinstance(memories, Memory):
             memories = memories.get_memories()
@@ -41,10 +45,6 @@ class Memory:
         # Least recently accessed memory
         # TODO can make much faster by keeping cache of memories sorted by access time
         return min(self.get_memories(), key=lambda memory: memory.access_time)
-
-    def __contains__(self, memory):
-        assert isinstance(memory, MemoryUnit)
-        return memory.id in self.memories
 
 
 class MemoryUnit:
@@ -83,7 +83,12 @@ class TrajectoryHead:
         # Reward discount factor
         self.gamma = gamma
 
+    def __contains__(self, unit):
+        assert isinstance(unit, (MemoryUnit, TrajectoryUnit))
+        return unit.id in self.units
+
     def add(self, unit, past=None):
+        assert isinstance(unit, (MemoryUnit, TrajectoryUnit))
         if unit not in self:
             if isinstance(unit, MemoryUnit):
                 self.memories.add(unit)
@@ -99,22 +104,22 @@ class TrajectoryHead:
     def get_units(self):
         return self.units.values()
 
-    # def get_memories(self):
-    #     return self.memories.get_memories()
+    def get_memories(self):
+        return self.memories.get_memories()
+
     def set_trace(self, trace):
         self.trace = trace
         for unit in self.units.values():
             unit.trace = trace
 
-    def __contains__(self, unit):
-        return unit.id in self.units
-
     def propogate_reward(self, running_future_discounted_reward=0, steps=0):
         propogated = {}
         steps += 1
+        future_discounted_reward = None
         for unit in self.get_units():
-            future_discounted_reward = unit.trace.reward + self.gamma * running_future_discounted_reward
-            unit.trace.future_discounted_reward = future_discounted_reward
+            if future_discounted_reward is None:
+                future_discounted_reward = unit.trace.r + self.gamma * running_future_discounted_reward
+                unit.trace.future_discounted_reward = future_discounted_reward
             unit.memory.future_discounted_reward = max(future_discounted_reward, unit.memory.future_discounted_reward)
             if steps < self.T:
                 for past in unit.pasts.get_units():
@@ -191,7 +196,7 @@ class Agent:
         # Merge memories that delta deems "the same" by action
         actions = self.merge_memories_by_action(new_head, c_t)
 
-        a_t = "terminal" if terminal else self.policy(c_t, new_head.memories).sample()
+        a_t = "terminal" if terminal else self.policy(c_t, new_head.get_memories()).sample()
 
         if a_t in actions:
             new_head.action_unit = actions[a_t]
@@ -245,19 +250,19 @@ class Agent:
         # TODO in rare cases, can also do full lookup
 
     def merge_memories_by_action(self, new_head, concept):
-        # Note: maybe memories with different rewards should be kept unmerged
+        # Note: maybe memories with different rewards/future-discounted-rewards should be kept unmerged
         # Note: if action is a tensor, python might not be able to use it as key
         actions = {}
         for m in self.M_t.get_memories():
             m.concept = concept
-            if m.action in actions:
-                m.reward = max(m.reward, actions[m.action])
-                m.access_time = max(m.access_time, actions[m.action].access_time)
+            if m.a in actions:
+                m.r = max(m.r, actions[m.a])
+                m.access_time = max(m.access_time, actions[m.a].access_time)
                 # TODO can be made slightly more efficient by iterating merge and remove together
-                m.merge(actions[m.action])
-                self.Memory.remove(actions[m.action])
-                self.M_t.remove(actions[m.action], de_reference=False)
-            actions[m.action] = m
+                m.merge(actions[m.a])
+                self.Memory.remove(actions[m.a])
+                self.M_t.remove(actions[m.a], de_reference=False)
+            actions[m.a] = m
         return actions
 
     def learn(self):
