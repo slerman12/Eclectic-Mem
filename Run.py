@@ -103,7 +103,5 @@ if __name__ == "__main__":
                     ("Avg Head Size", agent.head_count / steps), ("Avg Num Explored", agent.explored_count / steps),
                     ("Lookup Count", agent.lookup_count), ("Avg Traversal Time", agent.traversal_time / steps),
                     ("Reward", total_reward))
-        if agent.lookup_count > steps:
-            print("waaaaaaaaaaaaaaa")
         agent.learn()
         rewards.append(total_reward)
