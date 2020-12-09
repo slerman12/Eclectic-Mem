@@ -94,6 +94,7 @@ if __name__ == "__main__":
             steps += 1
             if done or steps == episode_len:
                 agent.add_terminal(o.flatten(), r)
+                steps += 1
                 o = env.reset()
                 r = 0
                 break
@@ -102,5 +103,7 @@ if __name__ == "__main__":
                     ("Avg Head Size", agent.head_count / steps), ("Avg Num Explored", agent.explored_count / steps),
                     ("Lookup Count", agent.lookup_count), ("Avg Traversal Time", agent.traversal_time / steps),
                     ("Reward", total_reward))
+        if agent.lookup_count > steps:
+            print("waaaaaaaaaaaaaaa")
         agent.learn()
         rewards.append(total_reward)

@@ -186,18 +186,15 @@ class Agent:
                 # Note: not traversing terminal observations or current trajectory
                 if m.action != "terminal" and m.future_discounted_reward != -inf:
                     delta = self.delta(concept, m.concept)
+                    max_delta = min(max(delta, max_delta), self.delta_margin)
                     if delta >= self.delta_margin:
                         # Create new connection
                         self.connect_memory(new_head, m, access_time)
-                        max_delta = self.delta_margin
-                        continue
-                    if delta > max_delta:
-                        max_delta = delta
-                        if traverse:
-                            # Greedy traversal
-                            self.traverse(new_head, concept, access_time, m.futures + m.pasts, explored, delta, True)
+                    elif delta > max_delta and traverse:
+                        # Greedy traversal
+                        return self.traverse(new_head, concept, access_time, m.futures + m.pasts, explored, delta, True)
 
-        if self.Memory.n and traverse:
+        if explored.n < self.Memory.n and explored.n < self.max_traversal_steps and new_head.n < self.k and traverse:
             self.lookup_count += 1
             # TODO should be randomly shuffled Memory e.g. via O(1) random sampling
             return self.traverse(new_head, concept, access_time, self.Memory, explored, max_delta, True)
@@ -220,8 +217,4 @@ class Agent:
         self.policy.train(self.Traces)
 
         self.Traces = []
-
-        self.lookup_count = 0
-        self.traversal_time = 0
-        self.head_count = 0
-        self.explored_count = 0
+        self.lookup_count = self.traversal_time = self.head_count = self.explored_count = 0
