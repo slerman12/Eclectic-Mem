@@ -177,6 +177,7 @@ class Agent:
                 delta = self.delta(concept, m.concept)
                 if delta >= self.delta_margin:
                     # Create new connection
+                    # TODO don't connect if m is terminal or future discounted reward is -inf
                     self.connect_memory(new_head, m, access_time)
                     max_delta = self.delta_margin
                     continue
