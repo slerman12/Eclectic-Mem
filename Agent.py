@@ -1,14 +1,17 @@
 import secrets
 import time
-from copy import copy
 from math import inf
 
 
 class Memory:
-    def __init__(self, N=inf):
+    def __init__(self, N=inf, track_actions=False):
         self.N = N
         self.n = 0
         self.memories = {}
+
+        self.track_actions = track_actions
+        if track_actions:
+            self.action_memories = {}
 
     def __contains__(self, memory):
         assert isinstance(memory, MemoryUnit)
@@ -19,7 +22,7 @@ class Memory:
 
     def add(self, memories):
         if isinstance(memories, Memory):
-            if self.n + memories.n <= self.N:
+            if self.n + memories.n <= self.N and not self.track_actions:
                 self.memories.update(memories.memories)
                 self.n = len(self.memories)
                 return self
@@ -35,6 +38,11 @@ class Memory:
 
                 self.memories[memory.id] = memory
                 self.n += 1
+                if self.track_actions:
+                    if memory.action in self.action_memories:
+                        self.action_memories[memory.action].append(memory)
+                    else:
+                        self.action_memories[memory.action] = [memory]
 
         return self
 
@@ -69,114 +77,17 @@ class MemoryUnit:
         self.pasts = Memory()
         self.future_discounted_reward = -inf
 
-    def merge_connections(self, memory):
-        # Merge futures/pasts with another memory
-        self.futures.add(memory.futures)
-        self.pasts.add(memory.pasts)
-        for m in memory.futures.get_memories():
-            m.pasts.add(self)
-        for m in memory.pasts.get_memories():
-            m.futures.add(self)
-
-
-class TrajectoryHead:
-    def __init__(self, T=inf, gamma=1):
-        self.units = {}
-        self.memories = Memory()
-        self.trace = None
-        self.action_unit = None
-        self.n = 0
-
-        # Reward time horizon
-        self.T = T
-        # Reward discount factor
-        self.gamma = gamma
-
-    def __contains__(self, unit):
-        assert isinstance(unit, (MemoryUnit, TrajectoryUnit))
-        return unit.id in self.units
-
-    def add(self, unit, past=None):
-        assert isinstance(unit, (MemoryUnit, TrajectoryUnit))
-        if unit not in self:
-            if isinstance(unit, MemoryUnit):
-                self.memories.add(unit)
-                self.units[unit.id] = TrajectoryUnit(unit, self.T, self.gamma)
-            elif isinstance(unit, TrajectoryUnit):
-                self.memories.add(unit.memory)
-                self.units[unit.id] = unit
-        if past is not None:
-            assert isinstance(past, TrajectoryUnit)
-            self.units[unit.id].pasts.add(past)
-        self.n = self.memories.n
-
-    def remove(self, unit):
-        if unit in self:
-            memory = self.units[unit.id].memory
-            del self.units[unit.id]
-            self.memories.remove(memory, de_reference=False)
-            self.n -= 1
-
-    def get_units(self):
-        return self.units.values()
-
-    def get_memories(self):
-        return self.memories.get_memories()
-
-    def set_trace(self, trace):
-        self.trace = trace
-        for unit in self.units.values():
-            unit.trace = trace
-
-    def propogate_reward(self, running_future_discounted_reward=0, steps=0, propogated=None):
-        if propogated is None:
-            propogated = {}
-        future_discounted_reward = None
-        steps += 1
-        pasts_propogated = {}
-        for unit in [self.units[ID] for ID in self.units if ID not in propogated]:
-            propogated.update(unit.id)
-            if future_discounted_reward is None:
-                future_discounted_reward = unit.trace.r + self.gamma * running_future_discounted_reward
-                unit.trace.future_discounted_reward = future_discounted_reward
-            # Note: maybe should do weighted avg instead of always taking max
-            unit.memory.future_discounted_reward = max(future_discounted_reward, unit.memory.future_discounted_reward)
-            if steps < self.T:
-                unit.pasts.propogate_reward(future_discounted_reward, steps, pasts_propogated)
-            else:
-                unit.pasts = TrajectoryHead(self.T, self.gamma)
-
-
-class TrajectoryUnit:
-    def __init__(self, memory, T=inf, gamma=1):
-        self.id = memory.id
-        self.memory = memory
-        self.pasts = TrajectoryHead(T, gamma)
-        self.trace = None
-
-    def merge_connections(self, unit):
-        # Merge pasts and memory futures/pasts with another unit
-        assert isinstance(unit, TrajectoryUnit)
-        self.pasts.units.update(unit.pasts.units)
-        self.pasts.memories.add(unit.pasts.memories)
-        self.pasts.n = self.pasts.memories.n
-        self.memory.merge_connections(unit.memory)
-
 
 class Trace:
-    def __init__(self, observation, concept, reward, action, memories, access_time, terminal=False):
+    def __init__(self, observation, memory, memories, past_trace=None):
         self.observation = observation
-        self.concept = concept
-        self.reward = reward
-        self.action = action
+        self.memory = memory
         self.memories = memories
-        self.access_time = access_time
-        self.future_discounted_reward = None
-        self.terminal = terminal
+        self.past_trace = past_trace
 
 
 class Agent:
-    def __init__(self, embed, delta, policy, N=inf, max_traversal_steps=inf, delta_margin=0.75, T=inf, gamma=1):
+    def __init__(self, embed, delta, policy, N=inf, k=inf, max_traversal_steps=inf, delta_margin=0.75, T=inf, gamma=1):
         # CNN
         self.embed = embed
         # Contrastive learning (perhaps with time-discounted probabilities)
@@ -185,24 +96,24 @@ class Agent:
         self.policy = policy
 
         self.Memory = Memory(N)
-        self.Head = TrajectoryHead(T, gamma)
+        self.Head = Memory(track_actions=True)
         self.Traces = []
 
+        self.k = k
         self.max_traversal_steps = max_traversal_steps
         self.delta_margin = delta_margin
+        # Reward time horizon
+        self.T = T
+        # Reward discount factor
+        self.gamma = gamma
 
     # Note: incompatible with batches
-    def act(self, o_t, r_t, propogate_reward=True):
-        a_t, head = self.update(o_t, r_t)
-        if propogate_reward:
-            head.propogate_reward()
-        return a_t
+    def act(self, o_t, r_t):
+        return self.update(o_t, r_t)
 
     # Note: incompatible with batches
-    def add_terminal(self, o_t, r_t, propogate_reward=True):
-        _, head = self.update(o_t, r_t, terminal=True)
-        if propogate_reward:
-            head.propogate_reward()
+    def add_terminal(self, o_t, r_t):
+        self.update(o_t, r_t, terminal=True)
 
     # Note: incompatible with batches
     def update(self, o_t, r_t, terminal=False):
@@ -211,56 +122,56 @@ class Agent:
 
         access_time = time.time()
 
-        new_head = TrajectoryHead(self.Head.T, self.Head.gamma)
-        current_positions = Memory()
+        new_head = Memory(track_actions=True)
+
+        # Traverse existing immediate connections
         explored = Memory()
-        for u in self.Head.get_units():
-            for m_future in u.memory.futures.get_memories():
-                explored.add(m_future)
-                current_positions.add(m_future.futures)
-                current_positions.add(m_future.pasts)
-                if self.delta(c_t, m_future.concept) >= self.delta_margin:
-                    new_head.add(m_future, u)
-                    m_future.access_time = access_time
+        max_delta = -inf
+        for m in self.Head.get_memories():
+            m_max_delta = self.traverse(new_head, c_t, access_time, current_positions=m.futures, explored=explored)
+            max_delta = max(max_delta, m_max_delta)
 
         # If existing connections do not yield similar memories, traverse to find similar memories; make new connections
+        # Alternatively: if new_head.n < self.k:
         if new_head.n == 0:
-            self.traverse(new_head, c_t, access_time, current_positions=current_positions, explored=explored)
+            self.traverse(new_head, c_t, access_time, "search_from_explored", explored, max_delta, traverse=True)
 
-        # Merge memories that delta deems "the same" by action
-        actions = self.merge_memories_by_action(new_head, c_t)
+        a_t = "terminal" if terminal else self.policy(c_t, new_head.get_memories()).sample().item()
+        # print(self.Memory.n, new_head.n, explored.n, a_t)
 
-        a_t = "terminal" if terminal else self.policy(c_t, new_head.get_memories()).sample()
+        # Store memory
+        m = MemoryUnit(c_t, r_t, a_t, access_time, terminal)
+        self.Memory.add(m)
+        # Create new connection
+        self.connect_memory(new_head, m, access_time)
 
-        if a_t in actions:
-            new_head.action_unit = actions[a_t]
-        else:
-            # Store memory
-            m = MemoryUnit(c_t, r_t, a_t, access_time, terminal)
-            self.Memory.add(m)
-            # Create new connection
-            self.connect_memory(new_head, m, access_time)
-            new_head.action_unit = new_head.units[m.id]
+        past_trace = self.Traces[-1] if len(self.Traces) > 0 else None
+        trace = Trace(o_t, m, new_head.get_memories(), past_trace)
+        self.Traces.append(trace)
 
-        new_head.set_trace(Trace(o_t, c_t, r_t, a_t, [copy(m) for m in new_head.get_memories()], access_time, terminal))
-        self.Traces.append(new_head.trace)
-        self.Head = TrajectoryHead(self.Head.T, self.Head.gamma) if terminal else new_head
+        new_head.action_memories = new_head.action_memories[a_t]
+        self.Head = Memory(track_actions=True) if terminal else new_head
 
-        return a_t, new_head
+        return a_t
 
     def connect_memory(self, new_head, memory, access_time):
-        if self.Head.action_unit is not None:
-            # Update memory futures/pasts
-            past_unit = self.Head.action_unit
-            past_unit.memory.futures.add(memory)
-            memory.pasts.add(past_unit.memory)
-            new_head.add(memory, past_unit)
-            memory.access_time = access_time
+        new_head.add(memory)
+        memory.access_time = access_time
+        if self.Head.action_memories is not None:
+            # TODO should new memories be connected only to last action ones like this or to all or to most predictive?
+            for past_memory in self.Head.action_memories:
+                # Update memory futures/pasts
+                past_memory.futures.add(memory)
+                memory.pasts.add(past_memory)
 
-    def traverse(self, new_head, concept, access_time, current_positions, explored, max_delta=-inf):
+    def traverse(self, new_head, concept, access_time, current_positions, explored, max_delta=-inf, traverse=False):
+        if current_positions == "search_from_explored":
+            current_positions = Memory()
+            for e in explored.get_memories():
+                current_positions.add(e.futures).add(e.pasts)
         for m in current_positions.get_memories():
-            if explored.n == self.max_traversal_steps or explored.n == self.Memory.n:
-                return
+            if explored.n >= self.max_traversal_steps or explored.n >= self.Memory.n or new_head.n >= self.k:
+                return max_delta
             if m not in explored:
                 explored.add(m)
                 delta = self.delta(concept, m.concept)
@@ -269,36 +180,31 @@ class Agent:
                     self.connect_memory(new_head, m, access_time)
                     max_delta = self.delta_margin
                     continue
-                if delta >= max_delta:
-                    self.traverse(new_head, concept, access_time, m.futures + m.pasts, explored, delta)
+                if delta > max_delta:
+                    max_delta = delta
+                    if traverse:
+                        # Greedy traversal
+                        self.traverse(new_head, concept, access_time, m.futures + m.pasts, explored, delta, traverse)
 
-        # TODO should be randomly shuffled Memory
-        return self.traverse(new_head, concept, access_time, self.Memory, explored, max_delta)
+        if self.Memory.n and traverse:
+            # TODO should be randomly shuffled Memory
+            return self.traverse(new_head, concept, access_time, self.Memory, explored, max_delta, traverse)
 
-    def merge_memories_by_action(self, new_head, concept):
-        # Note: maybe memories with different rewards/future-discounted-rewards should be kept unmerged
-        # Note: if action is a tensor, python might not be able to use it as key
-        actions = {}
-
-        for u in new_head.get_units():
-            u.memory.concept = concept
-            if u.memory.action in actions:
-                # Note: taking max instead of using a learning rule e.g. weighted avg
-                u.memory.reward = max(u.memory.reward, actions[u.memory.action].reward)
-                u.memory.future_discounted_reward = max(u.memory.future_discounted_reward,
-                                                        actions[u.memory.action].future_discounted_reward)
-                u.memory.access_time = max(u.memory.access_time, actions[u.memory.action].access_time)
-
-                # TODO can be made slightly more efficient by iterating merge and remove together
-                u.merge_connections(actions[u.memory.action])
-                self.Memory.remove(actions[u.memory.action].memory)
-                new_head.remove(actions[u.memory.action])
-
-            actions[u.memory.action] = u
-
-        return actions
+        return max_delta
 
     def learn(self):
+        # Propagate rewards
+        counter = 0
+        # TODO should start as Value
+        running_future_discounted_reward = 0
+        trace = self.Traces[-1]
+        while trace and counter < self.T:
+            trace.memory.future_discounted_reward = trace.memory.reward + self.gamma * running_future_discounted_reward
+            running_future_discounted_reward = trace.memory.future_discounted_reward
+            trace = trace.past_trace
+            counter += 1
+
         self.delta.train(self.Traces)
         self.policy.train(self.Traces)
+
         self.Traces = []

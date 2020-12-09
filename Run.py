@@ -1,12 +1,28 @@
 import gym
+import cv2
+from sklearn import random_projection
 from Agent import Agent
 import numpy as np
+import torch
 from torch.distributions import Categorical
 
 
 class Embed:
+    def __init__(self, random_projection_dim=None):
+        self.random_projection_dim = random_projection_dim
+
     def __call__(self, observation):
-        return observation
+        if self.random_projection_dim is None:
+            return observation
+        # Greyscale
+        observation = np.dot(observation[..., :3], [0.299, 0.587, 0.114])
+        # Image resize
+        observation = cv2.resize(observation, dsize=(80, 80))
+        # Flatten
+        observation = observation.flatten()
+        # Lower dimension projection
+        projection = random_projection.GaussianRandomProjection(self.random_projection_dim).fit([observation])
+        return projection.transform([observation])[0]
 
 
 class Delta:
@@ -18,26 +34,25 @@ class Delta:
 
 
 class Policy:
-    def __init__(self, num_actions, delta=None):
+    def __init__(self, num_actions, softmax_temp=0.1):
         self.num_actions = num_actions
-        self.delta = delta
+        self.softmax_temp = softmax_temp
 
     def train(self, traces):
         pass
 
     def __call__(self, c, memories):
         logits = np.empty(self.num_actions)
-        delta_sum = 0
         for m in memories:
-            logits[m.action] = m.future_discounted_reward
-            if self.delta is not None:
-                delta = self.delta(c, m.concept)
-                delta_sum += delta
-                logits[m.action] = logits[m.action] * delta
-        if self.delta is not None:
-            logits = logits / delta_sum
+            if m.action != "terminal" and m.future_discounted_reward != -np.inf:
+                if np.isnan(logits[m.action]):
+                    logits[m.action] = m.future_discounted_reward
+                else:
+                    logits[m.action] = max(logits[m.action], m.future_discounted_reward)
         np.nan_to_num(logits, copy=False, nan=float(np.nanmean(logits)) if len(memories) > 0 else 0)
-        return Categorical(logits=logits)
+        logits = logits * self.softmax_temp
+        # TODO can make deterministic instead (max Q-value) and just use exploration rate for exploration
+        return Categorical(logits=torch.from_numpy(logits))
 
 
 if __name__ == "__main__":
@@ -54,14 +69,14 @@ if __name__ == "__main__":
 
     embed = Embed()
     delta = Delta()
-    policy = Policy(outputs_dim, delta)
+    policy = Policy(outputs_dim)
 
-    agent = Agent(embed, delta, policy, delta_margin=1/0.02)
+    agent = Agent(embed, delta, policy, delta_margin=15, N=100000, k=100)
 
     rewards = []
 
     episode_len = np.inf
-    num_episodes = 100
+    num_episodes = 10000
 
     for episode in range(num_episodes):
         total_reward = 0
@@ -77,6 +92,7 @@ if __name__ == "__main__":
                 r = 0
                 break
         rewards.append(total_reward)
-        print("\nEpisode: ", episode)
+        print("Episode: ", episode)
         print("Reward: ", total_reward)
+        print()
         agent.learn()
