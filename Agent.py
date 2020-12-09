@@ -107,6 +107,12 @@ class Agent:
         # Reward discount factor
         self.gamma = gamma
 
+        # Data collection variables just for stats/graphing
+        self.lookup_count = 0
+        self.traversal_time = 0
+        self.head_count = 0
+        self.explored_count = 0
+
     # Note: incompatible with batches
     def act(self, o_t, r_t):
         return self.update(o_t, r_t)
@@ -120,9 +126,9 @@ class Agent:
         # Embedding/delta would ideally be recurrent and capture trajectory of at least two observations
         c_t = self.embed(o_t)
 
-        access_time = time.time()
-
         new_head = Memory(track_actions=True)
+
+        access_time = time.time()
 
         # Traverse existing immediate connections
         explored = Memory()
@@ -136,8 +142,11 @@ class Agent:
         if new_head.n == 0:
             self.traverse(new_head, c_t, access_time, "search_from_explored", explored, max_delta, traverse=True)
 
+        self.traversal_time += time.time() - access_time
+        self.head_count += new_head.n
+        self.explored_count += explored.n
+
         a_t = "terminal" if terminal else self.policy(c_t, new_head.get_memories()).sample().item()
-        # print(self.Memory.n, new_head.n, explored.n, a_t)
 
         # Store memory
         m = MemoryUnit(c_t, r_t, a_t, access_time, terminal)
@@ -174,22 +183,24 @@ class Agent:
                 return max_delta
             if m not in explored:
                 explored.add(m)
-                delta = self.delta(concept, m.concept)
-                if delta >= self.delta_margin:
-                    # Create new connection
-                    # TODO don't connect if m is terminal or future discounted reward is -inf
-                    self.connect_memory(new_head, m, access_time)
-                    max_delta = self.delta_margin
-                    continue
-                if delta > max_delta:
-                    max_delta = delta
-                    if traverse:
-                        # Greedy traversal
-                        self.traverse(new_head, concept, access_time, m.futures + m.pasts, explored, delta, traverse)
+                # Note: not traversing terminal observations or current trajectory
+                if m.action != "terminal" and m.future_discounted_reward != -inf:
+                    delta = self.delta(concept, m.concept)
+                    if delta >= self.delta_margin:
+                        # Create new connection
+                        self.connect_memory(new_head, m, access_time)
+                        max_delta = self.delta_margin
+                        continue
+                    if delta > max_delta:
+                        max_delta = delta
+                        if traverse:
+                            # Greedy traversal
+                            self.traverse(new_head, concept, access_time, m.futures + m.pasts, explored, delta, True)
 
         if self.Memory.n and traverse:
+            self.lookup_count += 1
             # TODO should be randomly shuffled Memory e.g. via O(1) random sampling
-            return self.traverse(new_head, concept, access_time, self.Memory, explored, max_delta, traverse)
+            return self.traverse(new_head, concept, access_time, self.Memory, explored, max_delta, True)
 
         return max_delta
 
@@ -209,3 +220,8 @@ class Agent:
         self.policy.train(self.Traces)
 
         self.Traces = []
+
+        self.lookup_count = 0
+        self.traversal_time = 0
+        self.head_count = 0
+        self.explored_count = 0

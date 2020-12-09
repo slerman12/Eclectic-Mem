@@ -55,6 +55,12 @@ class Policy:
         return Categorical(logits=torch.from_numpy(logits))
 
 
+def print_stats(*stats):
+    for stat in stats:
+        print(stat[0] + ": {}".format(stat[1]))
+    print()
+
+
 if __name__ == "__main__":
     env_id = 'CartPole-v0'
 
@@ -71,7 +77,7 @@ if __name__ == "__main__":
     delta = Delta()
     policy = Policy(outputs_dim)
 
-    agent = Agent(embed, delta, policy, delta_margin=15, N=100000, k=100)
+    agent = Agent(embed, delta, policy, delta_margin=15, N=100000, k=100, max_traversal_steps=10000)
 
     rewards = []
 
@@ -91,8 +97,10 @@ if __name__ == "__main__":
                 o = env.reset()
                 r = 0
                 break
-        rewards.append(total_reward)
-        print("Episode: ", episode)
-        print("Reward: ", total_reward)
-        print()
+
+        print_stats(("Episode", episode), ("Steps", steps), ("Memory Size", agent.Memory.n),
+                    ("Avg Head Size", agent.head_count / steps), ("Avg Num Explored", agent.explored_count / steps),
+                    ("Lookup Count", agent.lookup_count), ("Avg Traversal Time", agent.traversal_time / steps),
+                    ("Reward", total_reward))
         agent.learn()
+        rewards.append(total_reward)
