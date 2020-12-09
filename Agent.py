@@ -188,7 +188,7 @@ class Agent:
                         self.traverse(new_head, concept, access_time, m.futures + m.pasts, explored, delta, traverse)
 
         if self.Memory.n and traverse:
-            # TODO should be randomly shuffled Memory
+            # TODO should be randomly shuffled Memory e.g. via O(1) random sampling
             return self.traverse(new_head, concept, access_time, self.Memory, explored, max_delta, traverse)
 
         return max_delta
@@ -196,9 +196,9 @@ class Agent:
     def learn(self):
         # Propagate rewards
         counter = 0
-        # TODO should start as Value
-        running_future_discounted_reward = 0
         trace = self.Traces[-1]
+        # TODO should start as Value of last trace's observation
+        running_future_discounted_reward = 0
         while trace and counter < self.T:
             trace.memory.future_discounted_reward = trace.memory.reward + self.gamma * running_future_discounted_reward
             running_future_discounted_reward = trace.memory.future_discounted_reward
