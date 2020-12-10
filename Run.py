@@ -8,21 +8,8 @@ from torch.distributions import Categorical
 
 
 class Embed:
-    def __init__(self, random_projection_dim=None):
-        self.random_projection_dim = random_projection_dim
-
     def __call__(self, observation):
-        if self.random_projection_dim is None:
-            return observation
-        # Greyscale
-        observation = np.dot(observation[..., :3], [0.299, 0.587, 0.114])
-        # Image resize
-        observation = cv2.resize(observation, dsize=(80, 80))
-        # Flatten
-        observation = observation.flatten()
-        # Lower dimension projection
-        projection = random_projection.GaussianRandomProjection(self.random_projection_dim).fit([observation])
-        return projection.transform([observation])[0]
+        return observation
 
 
 class Delta:
