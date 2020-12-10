@@ -1,10 +1,10 @@
 import gym
-import cv2
-from sklearn import random_projection
 from Agent import Agent
 import numpy as np
 import torch
 from torch.distributions import Categorical
+import os
+import matplotlib.pyplot as plt
 
 
 class Embed:
@@ -48,6 +48,43 @@ def print_stats(*stats):
     print()
 
 
+def plot():
+    if not os.path.exists("Figures"):
+        os.makedirs("Figures")
+
+    _, ax = plt.subplots()
+
+    ax.plot(avg_head_sizes, label="Avg Head Size")
+    ax.plot(avg_num_explored, label="Avg Num Explored")
+    plt.legend()
+    ax.set_xlabel('Episode')
+    ax.set_title('Traversal Stats: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
+    ax.set_ylabel('Count')
+    plt.savefig('Figures/traversal_stats.png', bbox_inches='tight')
+    plt.close()
+
+    plt.plot(avg_traversal_time)
+    plt.xlabel("Episode")
+    plt.ylabel("Avg Traversal Time")
+    plt.title('Traversal Times: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
+    plt.savefig('Figures/traversal_times.png', bbox_inches='tight')
+    plt.close()
+
+    plt.plot(rewards)
+    plt.xlabel("Episode")
+    plt.ylabel("Total Reward")
+    plt.title('Rewards: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
+    plt.savefig('Figures/rewards.png', bbox_inches='tight')
+    plt.close()
+
+    plt.plot(avg_lookup_count)
+    plt.xlabel("Episode")
+    plt.ylabel("Avg Lookup Count")
+    plt.title('Lookups: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
+    plt.savefig('Figures/lookups.png', bbox_inches='tight')
+    plt.close()
+
+
 if __name__ == "__main__":
     env_id = 'CartPole-v0'
 
@@ -67,9 +104,13 @@ if __name__ == "__main__":
     agent = Agent(embed, delta, policy, delta_margin=15, N=100000, k=100, max_traversal_steps=10000)
 
     rewards = []
+    avg_head_sizes = []
+    avg_num_explored = []
+    avg_traversal_time = []
+    avg_lookup_count = []
 
     episode_len = np.inf
-    num_episodes = 10000
+    num_episodes = 2
 
     for episode in range(num_episodes):
         total_reward = 0
@@ -90,5 +131,11 @@ if __name__ == "__main__":
                     ("Avg Head Size", agent.head_count / steps), ("Avg Num Explored", agent.explored_count / steps),
                     ("Lookup Count", agent.lookup_count), ("Avg Traversal Time", agent.traversal_time / steps),
                     ("Reward", total_reward))
-        agent.learn()
         rewards.append(total_reward)
+        avg_head_sizes.append(agent.head_count / steps)
+        avg_num_explored.append(agent.explored_count / steps)
+        avg_traversal_time.append(agent.traversal_time / steps)
+        avg_lookup_count.append(agent.lookup_count / steps)
+        agent.learn()
+
+    plot()
