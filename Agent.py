@@ -4,14 +4,10 @@ from math import inf
 
 
 class Memory:
-    def __init__(self, N=inf, track_actions=False):
+    def __init__(self, N=inf):
         self.N = N
         self.n = 0
         self.memories = {}
-
-        self.track_actions = track_actions
-        if track_actions:
-            self.action_memories = {}
 
     def __contains__(self, memory):
         return memory.id in self.memories
@@ -21,7 +17,7 @@ class Memory:
 
     def add(self, memories):
         if isinstance(memories, Memory):
-            if self.n + memories.n <= self.N and not self.track_actions:
+            if self.n + memories.n <= self.N:
                 self.memories.update(memories.memories)
                 self.n = len(self.memories)
                 return self
@@ -37,11 +33,6 @@ class Memory:
 
                 self.memories[memory.id] = memory
                 self.n += 1
-                if self.track_actions:
-                    if memory.action in self.action_memories:
-                        self.action_memories[memory.action].append(memory)
-                    else:
-                        self.action_memories[memory.action] = [memory]
 
         return self
 
@@ -71,6 +62,7 @@ class MemoryUnit:
         self.reward = reward
         self.action = action
         self.access_time = time.time() if access_time is None else access_time
+        self.time_instantiated = self.access_time
         self.terminal = terminal
         self.futures = Memory()
         self.pasts = Memory()
@@ -100,7 +92,7 @@ class Agent:
         self.policy = policy
 
         self.Memory = Memory(N)
-        self.Head = Memory(track_actions=True)
+        self.Head = Memory()
         self.Traces = []
 
         self.k = k
@@ -130,7 +122,7 @@ class Agent:
         # Embedding/delta would ideally be recurrent and capture trajectory of at least two observations
         c_t = self.embed(o_t)
 
-        new_head = Memory(track_actions=True)
+        new_head = Memory()
 
         access_time = time.time()
 
@@ -152,6 +144,8 @@ class Agent:
 
         a_t = "terminal" if terminal else self.policy(c_t, new_head.get_memories()).sample().item()
 
+        # TODO if terminal, can compute expected value from new_head memories to use in Trace reward propagation
+
         # Store memory
         m = MemoryUnit(c_t, r_t, a_t, access_time, terminal)
         self.Memory.add(m)
@@ -162,20 +156,18 @@ class Agent:
         trace = Trace(o_t, m, new_head.get_memories(), past_trace)
         self.Traces.append(trace)
 
-        new_head.action_memories = new_head.action_memories[a_t]
-        self.Head = Memory(track_actions=True) if terminal else new_head
+        self.Head = Memory() if terminal else new_head
 
         return a_t
 
     def connect_memory(self, new_head, memory, access_time):
         new_head.add(memory)
         memory.access_time = access_time
-        if self.Head.action_memories is not None:
-            # TODO should new memories be connected only to last action ones like this or to all or to most predictive?
-            for past_memory in self.Head.action_memories:
-                # Update memory futures/pasts
-                past_memory.futures.add(memory)
-                memory.pasts.add(past_memory)
+        # TODO should new memories be connected to all last ones or to most predictive or...?
+        for past_memory in self.Head.get_memories():
+            # Update memory futures/pasts
+            past_memory.futures.add(memory)
+            memory.pasts.add(past_memory)
 
     def traverse(self, new_head, concept, access_time, current_positions, explored, max_delta=-inf, traverse=False):
         if current_positions == "search_from_explored":
