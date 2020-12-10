@@ -14,7 +14,6 @@ class Memory:
             self.action_memories = {}
 
     def __contains__(self, memory):
-        assert isinstance(memory, MemoryUnit)
         return memory.id in self.memories
 
     def __add__(self, memories):
@@ -84,6 +83,11 @@ class Trace:
         self.memory = memory
         self.memories = memories
         self.past_trace = past_trace
+
+    def propagate_reward(self, value=0, gamma=1, T=inf):
+        self.memory.future_discounted_reward = self.memory.reward + gamma * value
+        if T > 1 and self.past_trace is not None:
+            self.past_trace.propagate_reward(self.memory.future_discounted_reward, gamma, T - 1)
 
 
 class Agent:
@@ -202,16 +206,8 @@ class Agent:
         return max_delta
 
     def learn(self):
-        # Propagate rewards
-        counter = 0
-        trace = self.Traces[-1]
-        # TODO should start as Value of last trace's observation
-        running_future_discounted_reward = 0
-        while trace and counter < self.T:
-            trace.memory.future_discounted_reward = trace.memory.reward + self.gamma * running_future_discounted_reward
-            running_future_discounted_reward = trace.memory.future_discounted_reward
-            trace = trace.past_trace
-            counter += 1
+        # TODO should use Value of last trace's observation
+        self.Traces[-1].propagate_reward(value=0, gamma=self.gamma, T=self.T)
 
         self.delta.train(self.Traces)
         self.policy.train(self.Traces)
