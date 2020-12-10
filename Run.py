@@ -48,40 +48,98 @@ def print_stats(*stats):
     print()
 
 
-def plot():
-    if not os.path.exists("Figures"):
-        os.makedirs("Figures")
+def plot(name="Standard"):
+    dir_name = "Figures/" + name
+    if not os.path.exists(dir_name):
+        os.makedirs(dir_name)
 
     _, ax = plt.subplots()
-
     ax.plot(avg_head_sizes, label="Avg Head Size")
     ax.plot(avg_num_explored, label="Avg Num Explored")
     plt.legend()
     ax.set_xlabel('Episode')
     ax.set_title('Traversal Stats: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
     ax.set_ylabel('Count')
-    plt.savefig('Figures/traversal_stats.png', bbox_inches='tight')
+    plt.savefig(dir_name + '/traversal_stats.png', bbox_inches='tight')
+    plt.close()
+
+    _, ax = plt.subplots()
+    ax.plot(rewards, label="Reward")
+    ax.plot(lookup_count, label="Lookup Count")
+    plt.legend()
+    ax.set_xlabel('Episode')
+    ax.set_title('Reward vs. Lookups: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
+    plt.savefig(dir_name + '/reward_vs_lookups.png', bbox_inches='tight')
+    plt.close()
+
+    plt.plot(avg_head_size_per_explored)
+    plt.xlabel("Episode")
+    plt.ylabel("Avg Head Size / Avg Num Explored")
+    plt.title('Head Size Per Explored: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
+    plt.savefig(dir_name + '/head_size_per_explored.png', bbox_inches='tight')
+    plt.close()
+
+    plt.plot(avg_head_sizes, avg_num_explored)
+    plt.xlabel("Avg Head Size")
+    plt.ylabel("Avg Num Explored")
+    plt.title('Head Size Vs. Explored: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
+    plt.savefig(dir_name + '/head_size_vs_explored.png', bbox_inches='tight')
+    plt.close()
+
+    plt.plot(avg_head_sizes, rewards)
+    plt.xlabel("Avg Head Size")
+    plt.ylabel("Reward")
+    plt.title('Head Size Vs. Reward: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
+    plt.savefig(dir_name + '/head_size_vs_reward.png', bbox_inches='tight')
+    plt.close()
+
+    plt.plot(avg_num_explored, rewards)
+    plt.xlabel("Avg Num Explored")
+    plt.ylabel("Reward")
+    plt.title('Explored Vs. Reward: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
+    plt.savefig(dir_name + '/explored_vs_reward.png', bbox_inches='tight')
+    plt.close()
+
+    plt.plot(avg_num_explored)
+    plt.xlabel("Episode")
+    plt.ylabel("Avg Num Explored")
+    plt.title('Explored: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
+    plt.savefig(dir_name + '/explored.png', bbox_inches='tight')
+    plt.close()
+
+    plt.plot(avg_head_sizes)
+    plt.xlabel("Episode")
+    plt.ylabel("Avg Head Size")
+    plt.title('Head Sizes: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
+    plt.savefig(dir_name + '/head_size.png', bbox_inches='tight')
     plt.close()
 
     plt.plot(avg_traversal_time)
     plt.xlabel("Episode")
     plt.ylabel("Avg Traversal Time")
     plt.title('Traversal Times: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
-    plt.savefig('Figures/traversal_times.png', bbox_inches='tight')
+    plt.savefig(dir_name + '/traversal_times.png', bbox_inches='tight')
     plt.close()
 
     plt.plot(rewards)
     plt.xlabel("Episode")
     plt.ylabel("Total Reward")
     plt.title('Rewards: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
-    plt.savefig('Figures/rewards.png', bbox_inches='tight')
+    plt.savefig(dir_name + '/rewards.png', bbox_inches='tight')
     plt.close()
 
     plt.plot(avg_lookup_count)
     plt.xlabel("Episode")
     plt.ylabel("Avg Lookup Count")
     plt.title('Lookups: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
-    plt.savefig('Figures/lookups.png', bbox_inches='tight')
+    plt.savefig(dir_name + '/lookups.png', bbox_inches='tight')
+    plt.close()
+
+    plt.plot(lookup_count, rewards)
+    plt.xlabel("Lookup Count")
+    plt.ylabel("Reward")
+    plt.title('Lookups Vs. Reward: delta_margin=15, N=100000, k=100, max_traversal_steps=10000')
+    plt.savefig(dir_name + '/lookups_vs_reward.png', bbox_inches='tight')
     plt.close()
 
 
@@ -108,9 +166,11 @@ if __name__ == "__main__":
     avg_num_explored = []
     avg_traversal_time = []
     avg_lookup_count = []
+    lookup_count = []
+    avg_head_size_per_explored = []
 
     episode_len = np.inf
-    num_episodes = 2
+    num_episodes = 708
 
     for episode in range(num_episodes):
         total_reward = 0
@@ -136,6 +196,8 @@ if __name__ == "__main__":
         avg_num_explored.append(agent.explored_count / steps)
         avg_traversal_time.append(agent.traversal_time / steps)
         avg_lookup_count.append(agent.lookup_count / steps)
+        lookup_count.append(agent.lookup_count)
+        avg_head_size_per_explored.append((agent.head_count / steps) / (agent.explored_count / steps))
         agent.learn()
 
-    plot()
+    plot("Connect all")
