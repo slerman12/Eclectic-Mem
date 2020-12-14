@@ -134,7 +134,6 @@ class Agent:
             max_delta = max(max_delta, m_max_delta)
 
         # If existing connections do not yield similar memories, traverse to find similar memories; make new connections
-        # Alternatively: if new_head.n < self.k:
         if new_head.n == 0:
             self.traverse(new_head, c_t, access_time, "search_from_explored", explored, max_delta, traverse=True)
 
@@ -192,7 +191,7 @@ class Agent:
 
         if explored.n < self.Memory.n and explored.n < self.max_traversal_steps and new_head.n < self.k and traverse:
             self.lookup_count += 1
-            # TODO should be randomly shuffled Memory e.g. via O(1) random sampling
+            # TODO should be randomly shuffled Memory traversal e.g. via O(1) random sampling
             return self.traverse(new_head, concept, access_time, self.Memory, explored, max_delta, True)
 
         return max_delta
