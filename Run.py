@@ -153,7 +153,7 @@ if __name__ == "__main__":
     env_id = 'CartPole-v0'
 
     env = gym.make(env_id)
-    # env.seed(0)
+    env.seed(0)
 
     o = env.reset()
     r = 0
