@@ -29,17 +29,13 @@ class Policy:
         pass
 
     def __call__(self, c, memories):
-        logits = np.empty(self.num_actions)
+        logits = np.zeros(self.num_actions)
         for m in memories:
             if m.action != "terminal" and m.future_discounted_reward != -np.inf:
-                if np.isnan(logits[m.action]):
-                    logits[m.action] = m.future_discounted_reward
-                else:
-                    logits[m.action] = max(logits[m.action], m.future_discounted_reward)
-        np.nan_to_num(logits, copy=False, nan=float(np.nanmean(logits)) if len(memories) > 0 else 0)
+                logits[m.action] = max(logits[m.action], m.future_discounted_reward)
         logits = logits * self.softmax_temp
         # TODO can make deterministic instead (max Q-value) and just use exploration rate for exploration
-        return Categorical(logits=torch.from_numpy(logits))
+        return Categorical(logits=torch.tensor(logits.tolist()))
 
 
 def print_stats(*stats):
@@ -138,6 +134,13 @@ def plot(name="Standard"):
     plt.savefig(dir_name + '/lookups.png', bbox_inches='tight')
     plt.close()
 
+    plt.plot(avg_num_futures)
+    plt.xlabel("Episode")
+    plt.ylabel("Avg Num Futures")
+    plt.title('Futures: ' + params)
+    plt.savefig(dir_name + '/futures.png', bbox_inches='tight')
+    plt.close()
+
     plt.plot(lookup_count, rewards)
     plt.xlabel("Lookup Count")
     plt.ylabel("Reward")
@@ -150,7 +153,7 @@ if __name__ == "__main__":
     env_id = 'CartPole-v0'
 
     env = gym.make(env_id)
-    env.seed(0)
+    # env.seed(0)
 
     o = env.reset()
     r = 0
@@ -162,12 +165,13 @@ if __name__ == "__main__":
     delta = Delta()
     policy = Policy(outputs_dim)
 
-    agent = Agent(embed, delta, policy, delta_margin=15, N=100000, k=100, max_traversal_steps=700)
+    agent = Agent(embed, delta, policy, delta_margin=15, N=100000, k=100, max_traversal_steps=10000)
 
     rewards = []
     avg_head_sizes = []
     avg_num_explored = []
     avg_traversal_time = []
+    avg_num_futures = []
     avg_lookup_count = []
     lookup_count = []
     avg_head_size_per_explored = []
@@ -192,15 +196,16 @@ if __name__ == "__main__":
 
         print_stats(("Episode", episode), ("Steps", steps), ("Memory Size", agent.Memory.n),
                     ("Avg Head Size", agent.head_count / steps), ("Avg Num Explored", agent.explored_count / steps),
-                    ("Lookup Count", agent.lookup_count), ("Avg Traversal Time", agent.traversal_time / steps),
-                    ("Reward", total_reward))
+                    ("Avg Num Futures", agent.futures_count / steps), ("Lookup Count", agent.lookup_count),
+                    ("Avg Traversal Time", agent.traversal_time / steps), ("Reward", total_reward))
         rewards.append(total_reward)
         avg_head_sizes.append(agent.head_count / steps)
         avg_num_explored.append(agent.explored_count / steps)
         avg_traversal_time.append(agent.traversal_time / steps)
         avg_lookup_count.append(agent.lookup_count / steps)
         lookup_count.append(agent.lookup_count)
+        avg_num_futures.append((agent.futures_count / steps))
         avg_head_size_per_explored.append((agent.head_count / steps) / (agent.explored_count / steps))
         agent.learn()
 
-    plot("Connect all and max_traversal_steps is 700 (low)")
+    plot("All Connected Max Traversal 10000")

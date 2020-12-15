@@ -104,10 +104,7 @@ class Agent:
         self.gamma = gamma
 
         # Data collection variables just for stats/graphing
-        self.lookup_count = 0
-        self.traversal_time = 0
-        self.head_count = 0
-        self.explored_count = 0
+        self.lookup_count = self.traversal_time = self.head_count = self.explored_count = self.futures_count = 0
 
     # Note: incompatible with batches
     def act(self, o_t, r_t):
@@ -127,9 +124,11 @@ class Agent:
         access_time = time.time()
 
         # Traverse existing immediate connections
+        # TODO Number of futures currently very large; need way of merging redundancies & keep action diversity
         explored = Memory()
         max_delta = -inf
         for m in self.Head.get_memories():
+            self.futures_count += m.futures.n
             m_max_delta = self.traverse(new_head, c_t, access_time, current_positions=m.futures, explored=explored)
             max_delta = max(max_delta, m_max_delta)
 
@@ -192,6 +191,7 @@ class Agent:
         if explored.n < self.Memory.n and explored.n < self.max_traversal_steps and new_head.n < self.k and traverse:
             self.lookup_count += 1
             # TODO should be randomly shuffled Memory traversal e.g. via O(1) random sampling
+            # TODO see https://github.com/robtandy/randomdict
             return self.traverse(new_head, concept, access_time, self.Memory, explored, max_delta, True)
 
         return max_delta
@@ -204,4 +204,4 @@ class Agent:
         self.policy.train(self.Traces)
 
         self.Traces = []
-        self.lookup_count = self.traversal_time = self.head_count = self.explored_count = 0
+        self.lookup_count = self.traversal_time = self.head_count = self.explored_count = self.futures_count = 0
