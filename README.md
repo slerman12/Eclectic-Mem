@@ -1,2 +1,2 @@
 # Eclectic-Mem
-Efficient Few-Shot RL With Contrastive Learning And Episodic Control By Traversing Iteratively Through A Concept Map In An Expanding Memory
+**E**fficient Few-Shot RL With **C**ontrastive **L**earning And **E**pisodic **C**ontrol By **T**raversing **I**teratively Through A **C**oncept **M**ap In An **E**xpanding **M**emory
