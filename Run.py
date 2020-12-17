@@ -4,8 +4,12 @@ import numpy as np
 import torch
 from torch.distributions import Categorical
 import os
+import argparse
 import matplotlib.pyplot as plt
-
+from pathlib import Path
+snapshots_path = Path('./experiments')
+snapshots_path.mkdir(exist_ok=True)
+from trains import Task,Logger
 
 class Embed:
     def __call__(self, observation):
@@ -43,113 +47,16 @@ def print_stats(*stats):
         print(stat[0] + ": {}".format(stat[1]))
     print()
 
-
-def plot(name="Standard"):
-    dir_name = "Figures/" + name
-    if not os.path.exists(dir_name):
-        os.makedirs(dir_name)
-
-    params = "delta_margin={}, N={}, k={}, max_traversal_steps={}".format(agent.delta_margin, agent.Memory.N, agent.k,
-                                                                          agent.max_traversal_steps)
-
-    _, ax = plt.subplots()
-    ax.plot(avg_head_sizes, label="Avg Head Size")
-    ax.plot(avg_num_explored, label="Avg Num Explored")
-    plt.legend()
-    ax.set_xlabel('Episode')
-    ax.set_title('Traversal Stats: ' + params)
-    ax.set_ylabel('Count')
-    plt.savefig(dir_name + '/traversal_stats.png', bbox_inches='tight')
-    plt.close()
-
-    _, ax = plt.subplots()
-    ax.plot(rewards, label="Reward")
-    ax.plot(lookup_count, label="Lookup Count")
-    plt.legend()
-    ax.set_xlabel('Episode')
-    ax.set_title('Reward vs. Lookups: ' + params)
-    plt.savefig(dir_name + '/reward_vs_lookups.png', bbox_inches='tight')
-    plt.close()
-
-    plt.plot(avg_head_size_per_explored)
-    plt.xlabel("Episode")
-    plt.ylabel("Avg Head Size / Avg Num Explored")
-    plt.title('Head Size Per Explored: ' + params)
-    plt.savefig(dir_name + '/head_size_per_explored.png', bbox_inches='tight')
-    plt.close()
-
-    plt.plot(avg_head_sizes, avg_num_explored)
-    plt.xlabel("Avg Head Size")
-    plt.ylabel("Avg Num Explored")
-    plt.title('Head Size Vs. Explored: ' + params)
-    plt.savefig(dir_name + '/head_size_vs_explored.png', bbox_inches='tight')
-    plt.close()
-
-    plt.plot(avg_head_sizes, rewards)
-    plt.xlabel("Avg Head Size")
-    plt.ylabel("Reward")
-    plt.title('Head Size Vs. Reward: ' + params)
-    plt.savefig(dir_name + '/head_size_vs_reward.png', bbox_inches='tight')
-    plt.close()
-
-    plt.plot(avg_num_explored, rewards)
-    plt.xlabel("Avg Num Explored")
-    plt.ylabel("Reward")
-    plt.title('Explored Vs. Reward: ' + params)
-    plt.savefig(dir_name + '/explored_vs_reward.png', bbox_inches='tight')
-    plt.close()
-
-    plt.plot(avg_num_explored)
-    plt.xlabel("Episode")
-    plt.ylabel("Avg Num Explored")
-    plt.title('Explored: ' + params)
-    plt.savefig(dir_name + '/explored.png', bbox_inches='tight')
-    plt.close()
-
-    plt.plot(avg_head_sizes)
-    plt.xlabel("Episode")
-    plt.ylabel("Avg Head Size")
-    plt.title('Head Sizes: ' + params)
-    plt.savefig(dir_name + '/head_size.png', bbox_inches='tight')
-    plt.close()
-
-    plt.plot(avg_traversal_time)
-    plt.xlabel("Episode")
-    plt.ylabel("Avg Traversal Time")
-    plt.title('Traversal Times: ' + params)
-    plt.savefig(dir_name + '/traversal_times.png', bbox_inches='tight')
-    plt.close()
-
-    plt.plot(rewards)
-    plt.xlabel("Episode")
-    plt.ylabel("Total Reward")
-    plt.title('Rewards: ' + params)
-    plt.savefig(dir_name + '/rewards.png', bbox_inches='tight')
-    plt.close()
-
-    plt.plot(avg_lookup_count)
-    plt.xlabel("Episode")
-    plt.ylabel("Avg Lookup Count")
-    plt.title('Lookups: ' + params)
-    plt.savefig(dir_name + '/lookups.png', bbox_inches='tight')
-    plt.close()
-
-    plt.plot(avg_num_futures)
-    plt.xlabel("Episode")
-    plt.ylabel("Avg Num Futures")
-    plt.title('Futures: ' + params)
-    plt.savefig(dir_name + '/futures.png', bbox_inches='tight')
-    plt.close()
-
-    plt.plot(lookup_count, rewards)
-    plt.xlabel("Lookup Count")
-    plt.ylabel("Reward")
-    plt.title('Lookups Vs. Reward: ' + params)
-    plt.savefig(dir_name + '/lookups_vs_reward.png', bbox_inches='tight')
-    plt.close()
-
-
 if __name__ == "__main__":
+    task = Task.init(project_name="Eclectic-Mem", task_name="trains_plot", output_uri=str(snapshots_path))
+    parser = argparse.ArgumentParser(description='Parameter for agent')
+    parser.add_argument('--delta-margin', type=int, default=15, metavar='N')
+    parser.add_argument('-n', type=int, default=100000, metavar='N')
+    parser.add_argument('-k', type=int, default=100, metavar='N')
+    parser.add_argument('-max-traversal-steps', type=int, default=10000, metavar='N')
+    parser.add_argument('-num-episodes', type=int, default=150, metavar='N')
+    args = parser.parse_args()
+    logger = task.get_logger()
     env_id = 'CartPole-v0'
 
     env = gym.make(env_id)
@@ -168,21 +75,16 @@ if __name__ == "__main__":
     delta = Delta()
     policy = Policy(outputs_dim)
 
-    agent = Agent(embed, delta, policy, delta_margin=15, N=100000, k=100, max_traversal_steps=10000)
+    agent = Agent(embed, delta, policy, delta_margin=args.delta_margin, N=args.n, k=args.k, max_traversal_steps=args.max_traversal_steps)
 
     rewards = []
     avg_head_sizes = []
     avg_num_explored = []
-    avg_traversal_time = []
-    avg_num_futures = []
-    avg_lookup_count = []
     lookup_count = []
-    avg_head_size_per_explored = []
 
     episode_len = np.inf
-    num_episodes = 708
-
-    for episode in range(num_episodes):
+    make_scatter=lambda x:list(zip(*x))
+    for episode in range(args.num_episodes):
         total_reward = 0
         steps = 0
         while True:
@@ -196,19 +98,37 @@ if __name__ == "__main__":
                 o = env.reset()
                 r = 0
                 break
-
+        rewards.append(total_reward)
+        avg_head_sizes.append(agent.head_count / steps)
+        avg_num_explored.append(agent.explored_count / steps)
+        lookup_count.append(agent.lookup_count / steps)
         print_stats(("Episode", episode), ("Steps", steps), ("Memory Size", agent.Memory.n),
                     ("Avg Head Size", agent.head_count / steps), ("Avg Num Explored", agent.explored_count / steps),
                     ("Avg Num Futures", agent.futures_count / steps), ("Lookup Count", agent.lookup_count),
                     ("Avg Traversal Time", agent.traversal_time / steps), ("Reward", total_reward))
-        rewards.append(total_reward)
-        avg_head_sizes.append(agent.head_count / steps)
-        avg_num_explored.append(agent.explored_count / steps)
-        avg_traversal_time.append(agent.traversal_time / steps)
-        avg_lookup_count.append(agent.lookup_count / steps)
-        lookup_count.append(agent.lookup_count)
-        avg_num_futures.append((agent.futures_count / steps))
-        avg_head_size_per_explored.append((agent.head_count / steps) / (agent.explored_count / steps))
-        agent.learn()
+        logger.report_scalar("Explored vs Headsize", "Avg Num Explored", iteration=episode, value=agent.head_count / steps)
+        logger.report_scalar("Explored vs Headsize", "Avg Head Size", iteration=episode, value=agent.explored_count / steps)
+        logger.report_scalar("Reward vs Lookup", "Reward", iteration=episode,value=total_reward)
+        logger.report_scalar("Reward vs Lookup", "Lookup Count", iteration=episode,value=agent.lookup_count / steps)
+        logger.report_scalar("Avg Head Size / Avg Num Explored", "avarage", iteration=episode,value=agent.head_count / agent.explored_count)
+        logger.report_scalar("Avg Num Explored", "avarage", iteration=episode,value=agent.explored_count / steps)
+        logger.report_scalar("Avg Head Size","avarage", iteration=episode,value=agent.explored_count / steps)
+        logger.report_scalar("Avg Traversal Time", "avarage", iteration=episode, value=agent.traversal_time / steps)
+        logger.report_scalar("Avg Num Futures", "avarage", iteration=episode, value=agent.futures_count / steps)
 
-    plot("All Connected Max Traversal 10000")
+        agent.learn()
+    logger.report_scatter2d("Avg Head Size/Avg Num Explored", "series_markers", iteration=episode,
+                            scatter=make_scatter([avg_head_sizes,avg_num_explored]),
+                            xaxis="Avg Head Size", yaxis="Avg Num Explored", mode='markers')
+    logger.report_scatter2d("Avg Head Size/Rewards", "series_markers", iteration=episode,
+                            scatter=make_scatter([avg_head_sizes,rewards]), xaxis="Avg Head Size",
+                            yaxis="Reward", mode='markers')
+    logger.report_scatter2d("Avg Num Explored/Rewards", "series_markers", iteration=episode,
+                            scatter=make_scatter([avg_num_explored,rewards]), xaxis="Avg Num Explored",
+                            yaxis="Reward", mode='markers')
+    logger.report_scatter2d("Lookup Count/Rewards", "series_markers", iteration=episode,
+                            scatter=make_scatter([lookup_count,rewards]), xaxis="Lookup Count",
+                            yaxis="Reward", mode='markers')
+
+
+    # plot("All Connected Max Traversal 10000")
