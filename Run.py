@@ -3,13 +3,12 @@ from Agent import Agent
 import numpy as np
 import torch
 from torch.distributions import Categorical
-import os
 import argparse
-import matplotlib.pyplot as plt
 from pathlib import Path
 snapshots_path = Path('./experiments')
 snapshots_path.mkdir(exist_ok=True)
-from trains import Task,Logger
+from trains import Task, Logger
+
 
 class Embed:
     def __call__(self, observation):
@@ -47,6 +46,7 @@ def print_stats(*stats):
         print(stat[0] + ": {}".format(stat[1]))
     print()
 
+
 if __name__ == "__main__":
     task = Task.init(project_name="Eclectic-Mem", task_name="trains_plot", output_uri=str(snapshots_path))
     parser = argparse.ArgumentParser(description='Parameter for agent')
@@ -75,7 +75,8 @@ if __name__ == "__main__":
     delta = Delta()
     policy = Policy(outputs_dim)
 
-    agent = Agent(embed, delta, policy, delta_margin=args.delta_margin, N=args.n, k=args.k, max_traversal_steps=args.max_traversal_steps)
+    agent = Agent(embed, delta, policy, delta_margin=args.delta_margin, N=args.n, k=args.k,
+                  max_traversal_steps=args.max_traversal_steps)
 
     rewards = []
     avg_head_sizes = []
@@ -83,7 +84,7 @@ if __name__ == "__main__":
     lookup_count = []
 
     episode_len = np.inf
-    make_scatter=lambda x:list(zip(*x))
+
     for episode in range(args.num_episodes):
         total_reward = 0
         steps = 0
@@ -98,37 +99,43 @@ if __name__ == "__main__":
                 o = env.reset()
                 r = 0
                 break
+
         rewards.append(total_reward)
         avg_head_sizes.append(agent.head_count / steps)
         avg_num_explored.append(agent.explored_count / steps)
         lookup_count.append(agent.lookup_count / steps)
+
         print_stats(("Episode", episode), ("Steps", steps), ("Memory Size", agent.Memory.n),
                     ("Avg Head Size", agent.head_count / steps), ("Avg Num Explored", agent.explored_count / steps),
                     ("Avg Num Futures", agent.futures_count / steps), ("Lookup Count", agent.lookup_count),
                     ("Avg Traversal Time", agent.traversal_time / steps), ("Reward", total_reward))
-        logger.report_scalar("Explored vs Headsize", "Avg Num Explored", iteration=episode, value=agent.head_count / steps)
-        logger.report_scalar("Explored vs Headsize", "Avg Head Size", iteration=episode, value=agent.explored_count / steps)
-        logger.report_scalar("Reward vs Lookup", "Reward", iteration=episode,value=total_reward)
-        logger.report_scalar("Reward vs Lookup", "Lookup Count", iteration=episode,value=agent.lookup_count / steps)
-        logger.report_scalar("Avg Head Size / Avg Num Explored", "avarage", iteration=episode,value=agent.head_count / agent.explored_count)
-        logger.report_scalar("Avg Num Explored", "avarage", iteration=episode,value=agent.explored_count / steps)
-        logger.report_scalar("Avg Head Size","avarage", iteration=episode,value=agent.explored_count / steps)
-        logger.report_scalar("Avg Traversal Time", "avarage", iteration=episode, value=agent.traversal_time / steps)
-        logger.report_scalar("Avg Num Futures", "avarage", iteration=episode, value=agent.futures_count / steps)
+
+        logger.report_scalar("Explored vs Headsize", "Avg Num Explored",
+                             iteration=episode, value=agent.head_count / steps)
+        logger.report_scalar("Explored vs Headsize", "Avg Head Size",
+                             iteration=episode, value=agent.explored_count / steps)
+        logger.report_scalar("Reward vs Lookup", "Reward", iteration=episode, value=total_reward)
+        logger.report_scalar("Reward vs Lookup", "Lookup Count",
+                             iteration=episode, value=agent.lookup_count / steps)
+        logger.report_scalar("Avg Head Size / Avg Num Explored", "Average",
+                             iteration=episode, value=agent.head_count / agent.explored_count)
+        logger.report_scalar("Avg Num Explored", "Average", iteration=episode, value=agent.explored_count / steps)
+        logger.report_scalar("Avg Head Size", "Average", iteration=episode, value=agent.explored_count / steps)
+        logger.report_scalar("Avg Traversal Time", "Average", iteration=episode, value=agent.traversal_time / steps)
+        logger.report_scalar("Avg Num Futures", "Average", iteration=episode, value=agent.futures_count / steps)
 
         agent.learn()
+
+    make_scatter = lambda x: list(zip(*x))
     logger.report_scatter2d("Avg Head Size/Avg Num Explored", "series_markers", iteration=episode,
-                            scatter=make_scatter([avg_head_sizes,avg_num_explored]),
+                            scatter=make_scatter([avg_head_sizes, avg_num_explored]),
                             xaxis="Avg Head Size", yaxis="Avg Num Explored", mode='markers')
     logger.report_scatter2d("Avg Head Size/Rewards", "series_markers", iteration=episode,
-                            scatter=make_scatter([avg_head_sizes,rewards]), xaxis="Avg Head Size",
+                            scatter=make_scatter([avg_head_sizes, rewards]), xaxis="Avg Head Size",
                             yaxis="Reward", mode='markers')
     logger.report_scatter2d("Avg Num Explored/Rewards", "series_markers", iteration=episode,
-                            scatter=make_scatter([avg_num_explored,rewards]), xaxis="Avg Num Explored",
+                            scatter=make_scatter([avg_num_explored, rewards]), xaxis="Avg Num Explored",
                             yaxis="Reward", mode='markers')
     logger.report_scatter2d("Lookup Count/Rewards", "series_markers", iteration=episode,
-                            scatter=make_scatter([lookup_count,rewards]), xaxis="Lookup Count",
+                            scatter=make_scatter([lookup_count, rewards]), xaxis="Lookup Count",
                             yaxis="Reward", mode='markers')
-
-
-    # plot("All Connected Max Traversal 10000")
