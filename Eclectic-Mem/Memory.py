@@ -25,6 +25,7 @@ class Memory(Module):
         self.layer_norm = torch.nn.LayerNorm(total_size)
         self.attention_mlp = torch.nn.Sequential(torch.nn.Linear(c_size, c_size), torch.nn.ReLU(),
                                                  torch.nn.Linear(c_size, c_size))
+        self.retrieved = None
 
     def add(self, **kwargs):
         '''
@@ -140,7 +141,7 @@ class Memory(Module):
         k: num memories to retrieve
         delta: CL embed function
         '''
-        mems = self._query(c, k, delta, weigh_q) if self._j == self.j else self.retrieved
+        mems = self._query(c, k, delta, weigh_q) if self._j == self.j or self.retrieved is None else self.retrieved
         if encode_c:
             mems["c_cxt"] = c.view(mems["c"].shape)
 

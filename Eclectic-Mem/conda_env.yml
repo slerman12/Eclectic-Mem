@@ -1,4 +1,4 @@
-name: curl
+name: em
 channels:
   - defaults
 dependencies:

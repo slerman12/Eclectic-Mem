@@ -8,6 +8,8 @@ from encoder import make_encoder
 
 from Memory import Memory
 
+from torch.nn.parallel import DistributedDataParallel as DDP
+
 LOG_FREQ = 10000
 
 
