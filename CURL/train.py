@@ -62,7 +62,7 @@ def parse_args():
     parser.add_argument('--alpha_beta', default=0.5, type=float)
     # misc
     parser.add_argument('--seed', default=2, type=int)
-    parser.add_argument('--work_dir', default='.', type=str)
+    parser.add_argument('--work_dir', default='experiment', type=str)
     parser.add_argument('--save_tb', default=False, action='store_true')
     parser.add_argument('--save_buffer', default=False, action='store_true')
     parser.add_argument('--save_video', default=False, action='store_true')
@@ -181,16 +181,14 @@ def main(rank):
     exp_name = env_name + '-' + ts + '-im' + str(args.image_size) + '-b' \
                + str(args.batch_size) + '-s' + str(args.seed) + '-' + args.encoder_type
     args.work_dir = args.work_dir + '/' + exp_name
-
-    curl_utils.make_dir(args.work_dir)
+    from pathlib import Path
+    work_dir = Path('.') / args.work_dir
+    work_dir.mkdir(parents=True, exist_ok=True)
     video_dir = curl_utils.make_dir(os.path.join(args.work_dir, 'video'))
     model_dir = curl_utils.make_dir(os.path.join(args.work_dir, 'model'))
     buffer_dir = curl_utils.make_dir(os.path.join(args.work_dir, 'buffer'))
     video = VideoRecorder(video_dir if args.save_video else None)
-    from pathlib import Path
 
-    work_dir = Path(args.work_dir)
-    work_dir.mkdir(parents=True, exist_ok=True)
     print(work_dir)
     with open(work_dir / 'args.json', 'w') as f:
         json.dump(vars(args), f, sort_keys=True, indent=4)

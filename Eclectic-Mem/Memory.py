@@ -15,7 +15,7 @@ class Memory(Module):
         self.memory = {}
         self.j = j
         self._j = 0  # Counts updates
-
+        self.retrieved = None
         self.key_size = key_size
         self.head_size = c_size
         self.value_size = c_size
@@ -38,14 +38,16 @@ class Memory(Module):
         if "t" not in kwargs:
             kwargs["t"] = torch.tensor([time.time()] * batch_size)
         for key in kwargs:
+            # if key != 'step':
             assert kwargs[key].shape[0] == batch_size
-            memory = getattr(self, key, __default=torch.tensor([self.N] + kwargs[key].shape[1:]))
+            memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]))
             # torch.cat supposedly faster:
             # (https://stackoverflow.com/questions/51761806/is-it-possible-to-create-a-fifo-queue-with-pytorch)
-            new_memory = torch.cat((kwargs[key], memory[:-batch_size]))
+            new_memory = torch.cat((kwargs[key].to(memory.device), memory[:-batch_size])).to('cuda:0')
             setattr(self, key, new_memory)
             self.memory[key] = self.__dict__[key]
         assert self.c.shape[0] > self.n  # todo debugging check, can delete
+
         #  todo raise error if not all memory keys included in kwargs
         if self.n < self.N:
             self.n = min(self.N, self.n + batch_size)
@@ -65,7 +67,7 @@ class Memory(Module):
             tau = self.q[None, :self.n] * tau
         deltas, indices = torch.topk(tau, k=k, dim=1, sorted=False)
         assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == self.c.shape[0]  # todo debugging check, can delete
-
+        print(self.c.device)
         self.retrieved = [deltas.unsqueeze(dim=2)]
         for key in self.memories:
             self.retrieved.append(self.memory[key][indices])  # B x k x mem_size
@@ -140,16 +142,10 @@ class Memory(Module):
         k: num memories to retrieve
         delta: CL embed function
         '''
-        mems = self._query(c, k, delta, weigh_q) if self._j == self.j else self.retrieved
+        if self.n == 0:
+            return c
+        mems = self._query(c, k, delta, weigh_q) if self._j == 0 else self.retrieved
         if encode_c:
             mems["c_cxt"] = c.view(mems["c"].shape)
-
         c_prime = self._attend_over_memory(mems)
         return c_prime
-
-
-
-
-
-
-

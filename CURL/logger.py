@@ -57,7 +57,8 @@ class MetersGroup(object):
         return data
 
     def _dump_to_file(self, data):
-        with open(self._file_name, 'a') as f:
+
+        with open(self._file_name, 'w') as f:
             f.write(json.dumps(data) + '\n')
 
     def _format(self, key, value, ty):
