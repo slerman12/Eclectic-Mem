@@ -148,7 +148,8 @@ class Memory(Module):
         if self.n == 0:
             return c
         mems = self._query(c, k, delta, weigh_q) if self._j == 0 else self.retrieved
-        if encode_c:
-            mems["c_cxt"] = c.view(mems["c"].shape)
+        # print(mems)
+        # if encode_c:
+        #     mems["c_cxt"] = c.repeat(mems["c"].shape)
         c_prime = self._attend_over_memory(mems)
         return c_prime
