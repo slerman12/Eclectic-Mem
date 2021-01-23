@@ -66,11 +66,14 @@ class Memory(Module):
         if weigh_q:
             tau = self.q[None, :self.n] * tau
         deltas, indices = torch.topk(tau, k=k, dim=1, sorted=False)
-        assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == self.c.shape[0]  # todo debugging check, can delete
-        print(self.c.device)
+        # deltas.shape[0]
+        # print(deltas.shape[0], c.shape[0], deltas.shape[1], self.c.shape[0], self.c.shape)
+        assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == k  # todo debugging check, can delete
+
         self.retrieved = [deltas.unsqueeze(dim=2)]
-        for key in self.memories:
+        for key in self.memory:
             self.retrieved.append(self.memory[key][indices])  # B x k x mem_size
+        self.retrieved[-1] = self.retrieved[-1].unsqueeze(dim=2)
         self.retrieved = torch.cat(self.retrieved, dim=2)
 
         self._j = (self._j + 1) % self.j
