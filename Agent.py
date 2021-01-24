@@ -127,6 +127,7 @@ class Agent:
         # TODO Number of futures currently very large; need way of merging redundancies & keep action diversity
         explored = Memory()
         max_delta = -inf
+        # HEAD is where we are previously
         for m in self.Head.get_memories():
             self.futures_count += m.futures.n
             m_max_delta = self.traverse(new_head, c_t, access_time, current_positions=m.futures, explored=explored)

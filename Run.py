@@ -5,9 +5,10 @@ import torch
 from torch.distributions import Categorical
 import argparse
 from pathlib import Path
+
 snapshots_path = Path('./experiments')
 snapshots_path.mkdir(exist_ok=True)
-from trains import Task, Logger
+from clearml import Task, Logger
 
 
 class Embed:

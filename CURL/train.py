@@ -1,50 +1,46 @@
+import argparse
+import json
+import os
+# import gym
+import time
+
+import dmc2gym
 import numpy as np
 import torch
-import argparse
-import os
-import math
-# import gym
-import sys
-import random
-import time
-import json
-import dmc2gym
-import copy
 
-import utils
+import curl_utils
+from curl_sac import CurlSacAgent
 from logger import Logger
 from video import VideoRecorder
-
-from curl_sac import CurlSacAgent
-from torchvision import transforms
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
     # environment
-    parser.add_argument('--domain_name', default='cheetah')
-    parser.add_argument('--task_name', default='run')
+    parser.add_argument('--domain_name', default='cartpole')
+    parser.add_argument('--task_name', default='swingup')
     parser.add_argument('--pre_transform_image_size', default=100, type=int)
 
     parser.add_argument('--image_size', default=84, type=int)
-    parser.add_argument('--action_repeat', default=1, type=int)
+    parser.add_argument('--action_repeat', default=8, type=int)
     parser.add_argument('--frame_stack', default=3, type=int)
     # replay buffer
     parser.add_argument('--replay_buffer_capacity', default=100000, type=int)
     # train
     parser.add_argument('--agent', default='curl_sac', type=str)
     parser.add_argument('--init_steps', default=1000, type=int)
-    parser.add_argument('--num_train_steps', default=1000000, type=int)
+    parser.add_argument('--num_train_steps', default=250000, type=int)
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
     # eval
-    parser.add_argument('--eval_freq', default=1000, type=int)
+    parser.add_argument('--eval_freq', default=10000, type=int)
     parser.add_argument('--num_eval_episodes', default=10, type=int)
     # critic
     parser.add_argument('--critic_lr', default=1e-3, type=float)
     parser.add_argument('--critic_beta', default=0.9, type=float)
-    parser.add_argument('--critic_tau', default=0.01, type=float) # try 0.05 or 0.1
-    parser.add_argument('--critic_target_update_freq', default=2, type=int) # try to change it to 1 and retain 0.01 above
+    parser.add_argument('--critic_tau', default=0.01, type=float)  # try 0.05 or 0.1
+    parser.add_argument('--critic_target_update_freq', default=2,
+                        type=int)  # try to change it to 1 and retain 0.01 above
     # actor
     parser.add_argument('--actor_lr', default=1e-3, type=float)
     parser.add_argument('--actor_beta', default=0.9, type=float)
@@ -65,7 +61,7 @@ def parse_args():
     parser.add_argument('--alpha_lr', default=1e-4, type=float)
     parser.add_argument('--alpha_beta', default=0.5, type=float)
     # misc
-    parser.add_argument('--seed', default=1, type=int)
+    parser.add_argument('--seed', default=2, type=int)
     parser.add_argument('--work_dir', default='.', type=str)
     parser.add_argument('--save_tb', default=False, action='store_true')
     parser.add_argument('--save_buffer', default=False, action='store_true')
@@ -73,7 +69,7 @@ def parse_args():
     parser.add_argument('--save_model', default=False, action='store_true')
     parser.add_argument('--detach_encoder', default=False, action='store_true')
 
-    parser.add_argument('--log_interval', default=100, type=int)
+    parser.add_argument('--log_interval', default=20, type=int)
     args = parser.parse_args()
     return args
 
@@ -92,8 +88,8 @@ def evaluate(env, agent, video, num_episodes, L, step, args):
             while not done:
                 # center crop image
                 if args.encoder_type == 'pixel':
-                    obs = utils.center_crop_image(obs,args.image_size)
-                with utils.eval_mode(agent):
+                    obs = curl_utils.center_crop_image(obs, args.image_size)
+                with curl_utils.eval_mode(agent):
                     if sample_stochastically:
                         action = agent.sample_action(obs)
                     else:
@@ -105,8 +101,8 @@ def evaluate(env, agent, video, num_episodes, L, step, args):
             video.save('%d.mp4' % step)
             L.log('eval/' + prefix + 'episode_reward', episode_reward, step)
             all_ep_rewards.append(episode_reward)
-        
-        L.log('eval/' + prefix + 'eval_time', time.time()-start_time , step)
+
+        L.log('eval/' + prefix + 'eval_time', time.time() - start_time, step)
         mean_ep_reward = np.mean(all_ep_rewards)
         best_ep_reward = np.max(all_ep_rewards)
         L.log('eval/' + prefix + 'mean_episode_reward', mean_ep_reward, step)
@@ -150,11 +146,18 @@ def make_agent(obs_shape, action_shape, args, device):
     else:
         assert 'agent is not supported: %s' % args.agent
 
-def main():
+
+def main(rank):
+    os.environ['MASTER_ADDR'] = 'localhost'
+    os.environ['MASTER_PORT'] = '29500'
+    # os.environ['MUJOCO_GL'] = 'osmesa'
+    os.environ['LD_LIBRARY_PATH'] = '/u/jbi5/.mujoco/mujoco200/bin:/usr/lib/nvidia-440'
+    os.environ['MJLIB_PATH'] = '/u/jbi5/.mujoco/mujoco200_linux/bin/libmujoco200.so'
+    os.environ['MJKEY_PATH'] = '/u/jbi5/.mujoco/mjkey.txt'
     args = parse_args()
-    if args.seed == -1: 
-        args.__dict__["seed"] = np.random.randint(1,1000000)
-    utils.set_seed_everywhere(args.seed)
+    if args.seed == -1:
+        args.__dict__["seed"] = np.random.randint(1, 1000000)
+    curl_utils.set_seed_everywhere(args.seed)
     env = dmc2gym.make(
         domain_name=args.domain_name,
         task_name=args.task_name,
@@ -165,43 +168,43 @@ def main():
         width=args.pre_transform_image_size,
         frame_skip=args.action_repeat
     )
- 
-    env.seed(args.seed)
 
+    env.seed(args.seed)
     # stack several consecutive frames together
     if args.encoder_type == 'pixel':
-        env = utils.FrameStack(env, k=args.frame_stack)
-    
-    # make directory
-    ts = time.gmtime() 
-    ts = time.strftime("%m-%d", ts)    
+        env = curl_utils.FrameStack(env, k=args.frame_stack)
+
+    # make directo
+    ts = time.gmtime()
+    ts = time.strftime("%m-%d", ts)
     env_name = args.domain_name + '-' + args.task_name
-    exp_name = env_name + '-' + ts + '-im' + str(args.image_size) +'-b'  \
-    + str(args.batch_size) + '-s' + str(args.seed)  + '-' + args.encoder_type
-    args.work_dir = args.work_dir + '/'  + exp_name
+    exp_name = env_name + '-' + ts + '-im' + str(args.image_size) + '-b' \
+               + str(args.batch_size) + '-s' + str(args.seed) + '-' + args.encoder_type
+    args.work_dir = args.work_dir + '/' + exp_name
 
-    utils.make_dir(args.work_dir)
-    video_dir = utils.make_dir(os.path.join(args.work_dir, 'video'))
-    model_dir = utils.make_dir(os.path.join(args.work_dir, 'model'))
-    buffer_dir = utils.make_dir(os.path.join(args.work_dir, 'buffer'))
-
+    curl_utils.make_dir(args.work_dir)
+    video_dir = curl_utils.make_dir(os.path.join(args.work_dir, 'video'))
+    model_dir = curl_utils.make_dir(os.path.join(args.work_dir, 'model'))
+    buffer_dir = curl_utils.make_dir(os.path.join(args.work_dir, 'buffer'))
     video = VideoRecorder(video_dir if args.save_video else None)
+    from pathlib import Path
 
-    with open(os.path.join(args.work_dir, 'args.json'), 'w') as f:
+    work_dir = Path(args.work_dir)
+    work_dir.mkdir(parents=True, exist_ok=True)
+    print(work_dir)
+    with open(work_dir / 'args.json', 'w') as f:
         json.dump(vars(args), f, sort_keys=True, indent=4)
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     action_shape = env.action_space.shape
-
     if args.encoder_type == 'pixel':
-        obs_shape = (3*args.frame_stack, args.image_size, args.image_size)
-        pre_aug_obs_shape = (3*args.frame_stack,args.pre_transform_image_size,args.pre_transform_image_size)
+        obs_shape = (3 * args.frame_stack, args.image_size, args.image_size)
+        pre_aug_obs_shape = (3 * args.frame_stack, args.pre_transform_image_size, args.pre_transform_image_size)
     else:
         obs_shape = env.observation_space.shape
         pre_aug_obs_shape = obs_shape
-
-    replay_buffer = utils.ReplayBuffer(
+    replay_buffer = curl_utils.ReplayBuffer(
         obs_shape=pre_aug_obs_shape,
         action_shape=action_shape,
         capacity=args.replay_buffer_capacity,
@@ -209,14 +212,12 @@ def main():
         device=device,
         image_size=args.image_size,
     )
-
     agent = make_agent(
         obs_shape=obs_shape,
         action_shape=action_shape,
         args=args,
         device=device
     )
-
     L = Logger(args.work_dir, use_tb=args.save_tb)
 
     episode, episode_reward, done = 0, 0, True
@@ -227,7 +228,7 @@ def main():
 
         if step % args.eval_freq == 0:
             L.log('eval/episode', episode, step)
-            evaluate(env, agent, video, args.num_eval_episodes, L, step,args)
+            evaluate(env, agent, video, args.num_eval_episodes, L, step, args)
             if args.save_model:
                 agent.save_curl(model_dir, step)
             if args.save_buffer:
@@ -250,25 +251,23 @@ def main():
             if step % args.log_interval == 0:
                 L.log('train/episode', episode, step)
 
-        # sample action for data collection
+        # sample action for storage collection
         if step < args.init_steps:
             action = env.action_space.sample()
         else:
-            with utils.eval_mode(agent):
+            with curl_utils.eval_mode(agent):
                 action = agent.sample_action(obs)
 
         # run training update
         if step >= args.init_steps:
-            num_updates = 1 
+            num_updates = 1
             for _ in range(num_updates):
-                agent.update(replay_buffer, L, step)
+                agent.update(replay_buffer, L, step, device)
 
         next_obs, reward, done, _ = env.step(action)
 
-        # allow infinit bootstrap
-        done_bool = 0 if episode_step + 1 == env._max_episode_steps else float(
-            done
-        )
+        # allow infinite bootstrap
+        done_bool = 0 if episode_step + 1 == env._max_episode_steps else float(done)
         episode_reward += reward
         replay_buffer.add(obs, action, reward, next_obs, done_bool)
 
@@ -277,6 +276,6 @@ def main():
 
 
 if __name__ == '__main__':
-    torch.multiprocessing.set_start_method('spawn')
-
-    main()
+    # torch.multiprocessing.set_start_method('spawn')
+    main(0)
+    # torch.multiprocessing.spawn(main, nprocs=2, join=True)
