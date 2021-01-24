@@ -48,6 +48,7 @@ def weight_init(m):
 
 class Actor(nn.Module):
     """MLP actor network."""
+
     def __init__(
             self, obs_shape, action_shape, hidden_dim, encoder_type,
             encoder_feature_dim, log_std_min, log_std_max, num_layers, num_filters, memory=None
@@ -123,6 +124,7 @@ class Actor(nn.Module):
 
 class QFunction(nn.Module):
     """MLP for q-function."""
+
     def __init__(self, obs_dim, action_dim, hidden_dim):
         super().__init__()
 
@@ -141,12 +143,12 @@ class QFunction(nn.Module):
 
 class Critic(nn.Module):
     """Critic network, employes two q-functions."""
+
     def __init__(
             self, obs_shape, action_shape, hidden_dim, encoder_type,
             encoder_feature_dim, num_layers, num_filters, memory=None
     ):
         super().__init__()
-
 
         self.encoder = make_encoder(
             encoder_type, obs_shape, encoder_feature_dim, num_layers,
@@ -172,7 +174,7 @@ class Critic(nn.Module):
         if self.memory is None:
             c_prime = c
         else:
-            c_prime = self.memory(c, detach=detach_encoder)
+            c_prime = self.memory(c)
 
         q1 = self.Q1(c, action)
         q2 = self.Q2(c, action)
@@ -264,8 +266,9 @@ class EclecticMem(Memory):
         :return: c_prime: post-memory representation
         '''
 
-        c_prime = super()(c, self.k, self.delta, self.weigh_q)
+        c_prime = super().forward(c, self.k, self.delta, self.weigh_q)
 
+        # [B, N, C_size]
         if self.residual:
             c_prime = c_prime + c
 
@@ -277,6 +280,7 @@ class EclecticMem(Memory):
 
 class EclecticMemCurlSacAgent(object):
     """Eclectic-Mem adaptation with CURL representation learning with SAC."""
+
     def __init__(
             self,
             obs_shape,
@@ -369,7 +373,8 @@ class EclecticMemCurlSacAgent(object):
         if self.encoder_type == 'pixel':
             # create CURL encoder (the 128 batch size is probably unnecessary)
             self.CURL = CURL(obs_shape, encoder_feature_dim,
-                             self.curl_latent_dim, self.critic,self.critic_target, output_type='continuous').to(self.device)
+                             self.curl_latent_dim, self.critic, self.critic_target, output_type='continuous').to(
+                self.device)
 
             # optimizer for critic encoder for reconstruction loss
             self.encoder_optimizer = torch.optim.Adam(
@@ -382,10 +387,10 @@ class EclecticMemCurlSacAgent(object):
 
             # create EclecticMem
             self.EclecticMem = EclecticMem(delta=self.CURL.compute_logits, N=em_N, j=em_j, k=em_k, weigh_q=em_weigh_q,
-                                           c_size=encoder_feature_dim)
+                                           c_size=encoder_feature_dim).to(self.device)
 
             self.critic.memory = self.EclecticMem
-            self.critic_target.memory = EclecticMem
+            self.critic_target.memory = self.EclecticMem
             self.actor.memory = self.EclecticMem
 
             # self.em_optimizer = torch.optim.Adam(self.EclecticMem.parameters(), lr=encoder_lr)
@@ -444,8 +449,9 @@ class EclecticMemCurlSacAgent(object):
         # Update EclecticMem
         if self.critic.memory is not None:
             # note: could also add c_prime and c_prime_next
-            mem = {"c": c, "c_next": c_next, "r": reward, "q": target_Q, "a": action, "d": not_done, "step": step}
-            self.critic.memory.add(mem)
+            # mem = {"c": c, "c_next": c_next, "r": reward, "q": target_Q, "a": action, "d": not_done, "step": step}
+            mem = {"c": c, "c_next": c_next, "r": reward, "q": target_Q, "a": action, "d": not_done}
+            self.critic.memory.add(**mem)
 
         # Optimize the critic
         self.critic_optimizer.zero_grad()
@@ -504,7 +510,6 @@ class EclecticMemCurlSacAgent(object):
         if step % self.log_interval == 0:
             L.log('train/curl_loss', loss, step)
 
-
     def update(self, replay_buffer, L, step):
         if self.encoder_type == 'pixel':
             obs, action, reward, next_obs, not_done, cpc_kwargs = replay_buffer.sample_cpc()
@@ -533,7 +538,7 @@ class EclecticMemCurlSacAgent(object):
 
         if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
             obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
-            self.update_cpc(obs_anchor, obs_pos,cpc_kwargs, L, step)
+            self.update_cpc(obs_anchor, obs_pos, cpc_kwargs, L, step)
 
     def save(self, model_dir, step):
         torch.save(
@@ -560,4 +565,3 @@ class EclecticMemCurlSacAgent(object):
         self.critic.load_state_dict(
             torch.load('%s/critic_%s.pt' % (model_dir, step))
         )
- 
