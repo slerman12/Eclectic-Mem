@@ -384,7 +384,7 @@ class EclecticMemCurlSacAgent(object):
 
             # create EclecticMem
             self.EclecticMem = EclecticMem(delta=self.CURL.compute_logits, N=em_N, j=em_j, k=em_k, weigh_q=em_weigh_q,
-                                           c_size=encoder_feature_dim)
+                                           c_size=encoder_feature_dim).to(self.device)
 
             self.critic.memory = self.EclecticMem
             self.critic_target.memory = self.EclecticMem

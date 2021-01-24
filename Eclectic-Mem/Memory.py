@@ -18,13 +18,10 @@ class Memory(Module):
         self.retrieved = None
         self.key_size = key_size
         self.head_size = c_size
-        self.value_size = c_size
-        self.qkv_size = 2 * key_size + self.value_size
-        total_size = self.qkv_size * num_heads  # Denote as F.
-        self.qkv_encoder = torch.nn.Linear(c_size, total_size)
-        self.layer_norm = torch.nn.LayerNorm(total_size)
-        self.attention_mlp = torch.nn.Sequential(torch.nn.Linear(c_size, c_size), torch.nn.ReLU(),
-                                                 torch.nn.Linear(c_size, c_size))
+        self.c_size = c_size
+        # print(c_size, total_size, self.qkv_size)
+        self.qkv_encoder = None
+        self.num_heads = num_heads
 
     def add(self, **kwargs):
         '''
@@ -91,15 +88,15 @@ class Memory(Module):
         Returns:
           new_memory: New memory tensor.
         """
-
+        # qkv = [B, N, F]
         qkv = self.qkv_encoder(memory)
         # should probably be per q, k, and v, but whatever
-        qkv = self.layernorm(qkv)
+        qkv = self.layer_norm(qkv)
 
         mem_slots = memory.shape[1]  # Denoted as N.
 
         # [B, N, F] -> [B, N, H, F/H]
-        qkv_reshape = torch.reshape(qkv, [mem_slots, self.num_heads, self.qkv_size])
+        qkv_reshape = torch.reshape(qkv, [qkv.shape[0], mem_slots, self.num_heads, self.qkv_size])
 
         # [B, N, H, F/H] -> [B, H, N, F/H]
         qkv_transpose = qkv_reshape.permute(0, 2, 1, 3)
@@ -129,13 +126,13 @@ class Memory(Module):
         """
 
         attended_memory = self._mhdpa(memory)
-
+        print(attended_memory.shape)
         # Add a skip connection to the multiheaded attention's input.
-        memory = self.layer_norm(memory + attended_memory)
+        memory = self.layer_norm_mem(memory + attended_memory)
 
         # Add a skip connection to the attention_mlp's input.
-        memory = self.layer_norm(self.attention_mlp(memory) + memory)
-
+        memory = self.layer_norm_mem(self.attention_mlp(memory) + memory)
+        memory = self.skip_mlp(memory)
         return memory
 
     def forward(self, c, k, delta, weigh_q, encode_c=True):
@@ -148,6 +145,17 @@ class Memory(Module):
         if self.n == 0:
             return c
         mems = self._query(c, k, delta, weigh_q) if self._j == 0 else self.retrieved
+        if not self.qkv_encoder:
+            self.value_size = mems.shape[-1]
+            self.qkv_size = 2 * self.key_size + self.value_size  # 32*2+107 = 171
+            self.total_size = self.qkv_size * self.num_heads  # Denote as F.
+            self.layer_norm = torch.nn.LayerNorm(self.total_size).to('cuda:0')
+            self.layer_norm_mem = torch.nn.LayerNorm(mems.shape[-1]).to('cuda:0')
+            self.qkv_encoder = torch.nn.Linear(mems.shape[-1], self.total_size).to('cuda:0')
+            self.attention_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
+                                                     torch.nn.Linear(mems.shape[-1], mems.shape[-1])).to('cuda:0')
+            self.skip_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
+                                                torch.nn.Linear(mems.shape[-1], self.c_size)).to('cuda:0')
         # print(mems)
         # if encode_c:
         #     mems["c_cxt"] = c.repeat(mems["c"].shape)
