@@ -268,7 +268,6 @@ class EclecticMem(Memory):
 
         c_prime = super().forward(c, self.k, self.delta, self.weigh_q)
 
-        # [B, N, C_size]
         if self.residual:
             c_prime = c_prime + c
 

@@ -46,6 +46,7 @@ class Memory(Module):
             setattr(self, key, new_memory)
             self.memory[key] = self.__dict__[key]
         assert self.c.shape[0] > self.n  # todo debugging check, can delete
+
         #  todo raise error if not all memory keys included in kwargs
         if self.n < self.N:
             self.n = min(self.N, self.n + batch_size)
@@ -125,11 +126,16 @@ class Memory(Module):
 
         attended_memory = self._mhdpa(memory)
 
+        print(attended_memory.shape)
+
         # Add a skip connection to the multiheaded attention's input.
         memory = self.layer_norm(memory + attended_memory)
 
         # Add a skip connection to the attention_mlp's input.
+
         memory = self.layer_norm(self.attention_mlp(memory) + memory)
+        memory = self.layer_norm_mem(self.attention_mlp(memory) + memory)
+        memory = self.skip_mlp(memory)
 
         return memory
 
@@ -140,16 +146,25 @@ class Memory(Module):
         k: num memories to retrieve
         delta: CL embed function
         '''
+
         mems = self._query(c, k, delta, weigh_q) if self._j == self.j else self.retrieved
         if encode_c:
             mems["c_cxt"] = c.view(mems["c"].shape)
 
+        if self.n == 0:
+            return c
+        mems = self._query(c, k, delta, weigh_q) if self._j == 0 else self.retrieved
+        if not self.qkv_encoder:
+            self.value_size = mems.shape[-1]
+            self.qkv_size = 2 * self.key_size + self.value_size  # 32*2+107 = 171
+            self.total_size = self.qkv_size * self.num_heads  # Denote as F.
+            self.layer_norm = torch.nn.LayerNorm(self.total_size).to('cuda:0')
+            self.layer_norm_mem = torch.nn.LayerNorm(mems.shape[-1]).to('cuda:0')
+            self.qkv_encoder = torch.nn.Linear(mems.shape[-1], self.total_size).to('cuda:0')
+            self.attention_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
+                                                     torch.nn.Linear(mems.shape[-1], mems.shape[-1])).to('cuda:0')
+            self.skip_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
+                                                torch.nn.Linear(mems.shape[-1], self.c_size)).to('cuda:0')
+
         c_prime = self._attend_over_memory(mems)
         return c_prime
-
-
-
-
-
-
-

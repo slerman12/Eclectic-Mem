@@ -1,2 +1,5 @@
 .idea
 .DS_store
+curl_rainbow/
+examples/
+sac_ae/
