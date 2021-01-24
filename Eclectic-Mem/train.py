@@ -33,7 +33,7 @@ def parse_args():
     parser.add_argument('--replay_buffer_capacity', default=100000, type=int)
     # train
     parser.add_argument('--agent', default='curl_sac', type=str)
-    parser.add_argument('--init_steps', default=1, type=int)
+    parser.add_argument('--init_steps', default=1000, type=int)
     parser.add_argument('--num_train_steps', default=250000, type=int)
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
@@ -263,13 +263,13 @@ def main():
         else:
             with utils.eval_mode(agent):
                 action = agent.sample_action(obs)
-
         # run training update
         if step >= args.init_steps:
             num_updates = 1
             for _ in range(num_updates):
                 agent.update(replay_buffer, L, step)
 
+        # print(action.shape)
         next_obs, reward, done, _ = env.step(action)
 
         # allow infinit bootstrap

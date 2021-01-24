@@ -43,7 +43,8 @@ class Memory(Module):
             new_memory = torch.cat((kwargs[key].to(memory.device), memory[:-batch_size])).to('cuda:0')
             setattr(self, key, new_memory)
             self.memory[key] = self.__dict__[key]
-        assert self.c.shape[0] > self.n  # todo debugging check, can delete
+        # print(self.c.shape[0], self.n)
+        assert self.c.shape[0] >= self.n  # todo debugging check, can delete
 
         #  todo raise error if not all memory keys included in kwargs
         if self.n < self.N:
@@ -126,13 +127,12 @@ class Memory(Module):
         """
 
         attended_memory = self._mhdpa(memory)
-        print(attended_memory.shape)
         # Add a skip connection to the multiheaded attention's input.
         memory = self.layer_norm_mem(memory + attended_memory)
 
         # Add a skip connection to the attention_mlp's input.
         memory = self.layer_norm_mem(self.attention_mlp(memory) + memory)
-        memory = self.skip_mlp(memory)
+        memory = torch.mean(memory, dim=1)
         return memory
 
     def forward(self, c, k, delta, weigh_q, encode_c=True):
@@ -154,10 +154,12 @@ class Memory(Module):
             self.qkv_encoder = torch.nn.Linear(mems.shape[-1], self.total_size).to('cuda:0')
             self.attention_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
                                                      torch.nn.Linear(mems.shape[-1], mems.shape[-1])).to('cuda:0')
-            self.skip_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
-                                                torch.nn.Linear(mems.shape[-1], self.c_size)).to('cuda:0')
+            self.project_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
+                                                   torch.nn.Linear(mems.shape[-1], self.c_size)).to('cuda:0')
         # print(mems)
         # if encode_c:
         #     mems["c_cxt"] = c.repeat(mems["c"].shape)
-        c_prime = self._attend_over_memory(mems)
+        memory = self._attend_over_memory(mems)
+        c_prime = self.project_mlp(memory)
+        print('c', c.shape, 'memory', memory.shape, 'mems', mems.shape, 'prime c', c_prime.shape)
         return c_prime
