@@ -68,15 +68,14 @@ class Memory(Module):
         # print(deltas.shape[0], c.shape[0], deltas.shape[1], self.c.shape[0], self.c.shape)
         assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == k  # todo debugging check, can delete
 
-        self.retrieved = [deltas.unsqueeze(dim=2)]
+        result = [deltas.unsqueeze(dim=2)]
         for key in self.memory:
-            self.retrieved.append(self.memory[key][indices])  # B x k x mem_size
-        self.retrieved[-1] = self.retrieved[-1].unsqueeze(dim=2)
-        self.retrieved = torch.cat(self.retrieved, dim=2)
+            result.append(self.memory[key][indices])  # B x k x mem_size
+        result[-1] = result[-1].unsqueeze(dim=2)
 
         self._j = (self._j + 1) % self.j
 
-        return self.retrieved
+        return torch.cat(result, dim=2)
 
     def _mhdpa(self, memory):
         """Perform multi-head attention from 'Attention is All You Need'.
@@ -144,22 +143,25 @@ class Memory(Module):
         '''
         if self.n == 0:
             return c
-        mems = self._query(c, k, delta, weigh_q) if self._j == 0 else self.retrieved
-        if not self.qkv_encoder:
-            self.value_size = mems.shape[-1]
-            self.qkv_size = 2 * self.key_size + self.value_size  # 32*2+107 = 171
-            self.total_size = self.qkv_size * self.num_heads  # Denote as F.
-            self.layer_norm = torch.nn.LayerNorm(self.total_size).to('cuda:0')
-            self.layer_norm_mem = torch.nn.LayerNorm(mems.shape[-1]).to('cuda:0')
-            self.qkv_encoder = torch.nn.Linear(mems.shape[-1], self.total_size).to('cuda:0')
-            self.attention_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
-                                                     torch.nn.Linear(mems.shape[-1], mems.shape[-1])).to('cuda:0')
-            self.project_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
-                                                   torch.nn.Linear(mems.shape[-1], self.c_size)).to('cuda:0')
-        # print(mems)
-        # if encode_c:
-        #     mems["c_cxt"] = c.repeat(mems["c"].shape)
-        memory = self._attend_over_memory(mems)
-        c_prime = self.project_mlp(memory)
-        print('c', c.shape, 'memory', memory.shape, 'mems', mems.shape, 'prime c', c_prime.shape)
+
+        if self._j == 0 or c.shape[0] == 1:
+            mems = self._query(c, k, delta, weigh_q)
+            if not self.qkv_encoder:
+                self.value_size = mems.shape[-1]
+                self.qkv_size = 2 * self.key_size + self.value_size  # 32*2+107 = 171
+                self.total_size = self.qkv_size * self.num_heads  # Denote as F.
+                self.layer_norm = torch.nn.LayerNorm(self.total_size).to('cuda:0')
+                self.layer_norm_mem = torch.nn.LayerNorm(mems.shape[-1]).to('cuda:0')
+                self.qkv_encoder = torch.nn.Linear(mems.shape[-1], self.total_size).to('cuda:0')
+                self.attention_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]),
+                                                         torch.nn.ReLU(),
+                                                         torch.nn.Linear(mems.shape[-1], mems.shape[-1])).to('cuda:0')
+                self.project_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
+                                                       torch.nn.Linear(mems.shape[-1], self.c_size)).to('cuda:0')
+            memory = self._attend_over_memory(mems)
+            c_prime = self.project_mlp(memory)
+            self.retrieved = c_prime
+        else:
+            c_prime = self.retrieved
+        # print('_j', self._j, c.shape, c_prime.shape)
         return c_prime

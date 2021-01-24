@@ -22,8 +22,8 @@ from torchvision import transforms
 def parse_args():
     parser = argparse.ArgumentParser()
     # environment
-    parser.add_argument('--domain_name', default='cartpole')
-    parser.add_argument('--task_name', default='swingup')
+    parser.add_argument('--domain_name', default='finger')
+    parser.add_argument('--task_name', default='spin')
     parser.add_argument('--pre_transform_image_size', default=100, type=int)
 
     parser.add_argument('--image_size', default=84, type=int)
@@ -33,7 +33,7 @@ def parse_args():
     parser.add_argument('--replay_buffer_capacity', default=100000, type=int)
     # train
     parser.add_argument('--agent', default='curl_sac', type=str)
-    parser.add_argument('--init_steps', default=1, type=int)
+    parser.add_argument('--init_steps', default=1000, type=int)
     parser.add_argument('--num_train_steps', default=250000, type=int)
     parser.add_argument('--batch_size', default=32, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
@@ -262,6 +262,7 @@ def main():
             action = env.action_space.sample()
         else:
             with utils.eval_mode(agent):
+                # print(step, obs.shape, end='        ')
                 action = agent.sample_action(obs)
 
         # run training update
