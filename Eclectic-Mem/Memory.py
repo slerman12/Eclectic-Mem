@@ -15,16 +15,13 @@ class Memory(Module):
         self.memory = {}
         self.j = j
         self._j = 0  # Counts updates
-
+        self.retrieved = None
         self.key_size = key_size
         self.head_size = c_size
-        self.value_size = c_size
-        self.qkv_size = 2 * key_size + self.value_size
-        total_size = self.qkv_size * num_heads  # Denote as F.
-        self.qkv_encoder = torch.nn.Linear(c_size, total_size)
-        self.layer_norm = torch.nn.LayerNorm(total_size)
-        self.attention_mlp = torch.nn.Sequential(torch.nn.Linear(c_size, c_size), torch.nn.ReLU(),
-                                                 torch.nn.Linear(c_size, c_size))
+        self.c_size = c_size
+        # print(c_size, total_size, self.qkv_size)
+        self.qkv_encoder = None
+        self.num_heads = num_heads
 
     def add(self, **kwargs):
         '''
@@ -38,14 +35,16 @@ class Memory(Module):
         if "t" not in kwargs:
             kwargs["t"] = torch.tensor([time.time()] * batch_size)
         for key in kwargs:
+            # if key != 'step':
             assert kwargs[key].shape[0] == batch_size
-            memory = getattr(self, key, __default=torch.tensor([self.N] + kwargs[key].shape[1:]))
+            memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]))
             # torch.cat supposedly faster:
             # (https://stackoverflow.com/questions/51761806/is-it-possible-to-create-a-fifo-queue-with-pytorch)
-            new_memory = torch.cat((kwargs[key], memory[:-batch_size]))
+            new_memory = torch.cat((kwargs[key].to(memory.device), memory[:-batch_size])).to('cuda:0')
             setattr(self, key, new_memory)
             self.memory[key] = self.__dict__[key]
-        assert self.c.shape[0] > self.n  # todo debugging check, can delete
+        # print(self.c.shape[0], self.n)
+        assert self.c.shape[0] >= self.n  # todo debugging check, can delete
 
         #  todo raise error if not all memory keys included in kwargs
         if self.n < self.N:
@@ -65,11 +64,14 @@ class Memory(Module):
         if weigh_q:
             tau = self.q[None, :self.n] * tau
         deltas, indices = torch.topk(tau, k=k, dim=1, sorted=False)
-        assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == self.c.shape[0]  # todo debugging check, can delete
+        # deltas.shape[0]
+        # print(deltas.shape[0], c.shape[0], deltas.shape[1], self.c.shape[0], self.c.shape)
+        assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == k  # todo debugging check, can delete
 
         self.retrieved = [deltas.unsqueeze(dim=2)]
-        for key in self.memories:
+        for key in self.memory:
             self.retrieved.append(self.memory[key][indices])  # B x k x mem_size
+        self.retrieved[-1] = self.retrieved[-1].unsqueeze(dim=2)
         self.retrieved = torch.cat(self.retrieved, dim=2)
 
         self._j = (self._j + 1) % self.j
@@ -87,15 +89,15 @@ class Memory(Module):
         Returns:
           new_memory: New memory tensor.
         """
-
+        # qkv = [B, N, F]
         qkv = self.qkv_encoder(memory)
         # should probably be per q, k, and v, but whatever
-        qkv = self.layernorm(qkv)
+        qkv = self.layer_norm(qkv)
 
         mem_slots = memory.shape[1]  # Denoted as N.
 
         # [B, N, F] -> [B, N, H, F/H]
-        qkv_reshape = torch.reshape(qkv, [mem_slots, self.num_heads, self.qkv_size])
+        qkv_reshape = torch.reshape(qkv, [qkv.shape[0], mem_slots, self.num_heads, self.qkv_size])
 
         # [B, N, H, F/H] -> [B, H, N, F/H]
         qkv_transpose = qkv_reshape.permute(0, 2, 1, 3)
@@ -125,18 +127,12 @@ class Memory(Module):
         """
 
         attended_memory = self._mhdpa(memory)
-
-        print(attended_memory.shape)
-
         # Add a skip connection to the multiheaded attention's input.
-        memory = self.layer_norm(memory + attended_memory)
+        memory = self.layer_norm_mem(memory + attended_memory)
 
         # Add a skip connection to the attention_mlp's input.
-
-        memory = self.layer_norm(self.attention_mlp(memory) + memory)
         memory = self.layer_norm_mem(self.attention_mlp(memory) + memory)
-        memory = self.skip_mlp(memory)
-
+        memory = torch.mean(memory, dim=1)
         return memory
 
     def forward(self, c, k, delta, weigh_q, encode_c=True):
@@ -146,11 +142,6 @@ class Memory(Module):
         k: num memories to retrieve
         delta: CL embed function
         '''
-
-        mems = self._query(c, k, delta, weigh_q) if self._j == self.j else self.retrieved
-        if encode_c:
-            mems["c_cxt"] = c.view(mems["c"].shape)
-
         if self.n == 0:
             return c
         mems = self._query(c, k, delta, weigh_q) if self._j == 0 else self.retrieved
@@ -163,8 +154,12 @@ class Memory(Module):
             self.qkv_encoder = torch.nn.Linear(mems.shape[-1], self.total_size).to('cuda:0')
             self.attention_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
                                                      torch.nn.Linear(mems.shape[-1], mems.shape[-1])).to('cuda:0')
-            self.skip_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
-                                                torch.nn.Linear(mems.shape[-1], self.c_size)).to('cuda:0')
-
-        c_prime = self._attend_over_memory(mems)
+            self.project_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
+                                                   torch.nn.Linear(mems.shape[-1], self.c_size)).to('cuda:0')
+        # print(mems)
+        # if encode_c:
+        #     mems["c_cxt"] = c.repeat(mems["c"].shape)
+        memory = self._attend_over_memory(mems)
+        c_prime = self.project_mlp(memory)
+        print('c', c.shape, 'memory', memory.shape, 'mems', mems.shape, 'prime c', c_prime.shape)
         return c_prime
