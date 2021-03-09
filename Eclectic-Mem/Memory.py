@@ -158,6 +158,8 @@ class Memory(Module):
                                                          torch.nn.Linear(mems.shape[-1], mems.shape[-1])).to('cuda:0')
                 self.project_mlp = torch.nn.Sequential(torch.nn.Linear(mems.shape[-1], mems.shape[-1]), torch.nn.ReLU(),
                                                        torch.nn.Linear(mems.shape[-1], self.c_size)).to('cuda:0')
+            # TODO: batch size not fit
+            # TODO: self.retrived might need to modified:
             memory = self._attend_over_memory(mems)
             c_prime = self.project_mlp(memory)
             self.retrieved = c_prime
@@ -165,3 +167,63 @@ class Memory(Module):
             c_prime = self.retrieved
         # print('_j', self._j, c.shape, c_prime.shape)
         return c_prime
+
+
+import torch
+
+
+class ReplayBuffer(object):
+    def __init__(self, buffer_size, max_step):
+        self.buffer_size = buffer_size
+        self.buffer = []
+        self.index = 0
+        self.max_step = max_step
+
+    def size(self):
+        return len(self.buffer)
+
+    def append(self, feat):
+        """ feat is a dict including everything needed.
+        INPUT
+        'subgoals_completed': (bs, T)
+        'subgoal_progress': (bs, T)
+        'lang_goal_instr': #bs of packedsequence
+        'frames': (bs, T, 512, 7, 7)
+        'action_low': (bs, T)
+        'action_low_mask': # bs of tensor(n, 1, 300, 300)
+        'action_low_valid_interact': # (bs, T). mask indicate which time step has valid interaction.
+        --------
+        'out_action_low': (bs, T, 15)
+        'out_action_low_mask': (bs, T, 1, 300, 300)
+        'out_attn_scores'
+        'out_subgoal'
+        'out_progress'
+        'states': 2 elem of (bs, 1024), h and c at all time steps
+        'rewards': (bs, T)
+        --------
+        OUTPUT
+        rewards = batch['rewards']  # (bs, 1)
+        terminals = batch['terminals']  # (bs, 1)
+        obs = batch['observations']  # (bs, 512, 7, 7)
+        actions = batch['actions']  # (bs, 1)
+        hist_actions = batch['hist_actions']  # (bs, n+1, 1)
+        next_obs = batch['next_observations']  # (bs, 512, 7, 7)
+        steps = batch['steps']  # (bs, 1)
+        hist_obs = batch['history_observations']  # (bs, n, 512, 7, 7)
+        init_state = batch['initial_states']  # tuble of two element, each size (bs, 1024)
+        txts = batch['languages'] # (bs, packaged sequence)
+
+        """
+        # change feat into buffer
+        bs, T = action_low.shape
+        # keep each item tracked with length
+
+        if self.size() > self.buffer_size:
+            print('buffer size larger than set value, trimming...')
+            self.buffer = self.buffer[(self.size() - self.buffer_size):]
+        elif self.size() == self.buffer_size:
+            self.buffer[self.index] = obj
+            self.index += 1
+            self.index %= self.buffer_size  # if index > buffer_size, let index = 0
+        else:
+            self.buffer.append(obj)  # if not full, directly append

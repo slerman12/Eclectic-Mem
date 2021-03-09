@@ -119,12 +119,12 @@ class ReplayBuffer(Dataset):
         not_dones = torch.as_tensor(self.not_dones[idxs], device=self.device)
         return obses, actions, rewards, next_obses, not_dones
 
-    def sample_cpc(self, device):
+    def sample_cpc(self, device, j):
 
         # start = time.time()
+
         idxs = np.random.randint(
-            0, self.capacity if self.full else self.idx, size=self.batch_size
-        )
+            0, self.capacity if self.full else self.idx, size=self.batch_size)
 
         obses = self.obses[idxs]
         next_obses = self.next_obses[idxs]

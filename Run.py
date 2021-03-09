@@ -8,7 +8,6 @@ from pathlib import Path
 
 snapshots_path = Path('./experiments')
 snapshots_path.mkdir(exist_ok=True)
-from clearml import Task, Logger
 
 
 class Embed:
