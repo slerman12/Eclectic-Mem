@@ -1,4 +1,4 @@
-# Eclectic-Mem: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous-Control Meta-MDPs
+# Eclectic-Mem: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous-Control
 
 Eclectic-Mem: Efficient Contrastive Learner, Episodic Controller, And Transformer All In One Consolidated Lifelong Memory Architecture
 
