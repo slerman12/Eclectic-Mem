@@ -6,6 +6,8 @@ Eclectic Memory: Efficient Contrastive-Learner-Episodic-Controller-Transformer I
 
 Eclectic Memory: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control RL Tasks
 
+Eclectic Memory: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control Locomotive Generalization
+
 Eclectic: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control
 
 Eclectic: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous Control
