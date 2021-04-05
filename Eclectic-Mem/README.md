@@ -1,4 +1,6 @@
-# Eclectic: Efficient Contrastive Learning And Episodic Control
+# Eclectic-Mem: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous-Control Meta-MDPs
+
+Eclectic-Mem: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous-Control-Continual-General-Few-Shot-Meta-RL MDPs
 
 This repository is an extension of [CURL](https://mishalaskin.github.io/curl/) for the DeepMind control experiments. Atari experiments were done in a separate codebase available [here](https://github.com/aravindsrinivas/curl_rainbow). Implementation of SAC is based on [SAC+AE](https://github.com/denisyarats/pytorch_sac_ae) by Denis Yarats. 
 
