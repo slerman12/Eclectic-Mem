@@ -1,6 +1,6 @@
-# Eclectic: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous Action Spaces
+# Eclectic: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous Control
 
-Eclectic: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous Control
+Eclectic: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous Action Spaces
 
 Eclectic-Mem: Efficient Contrastive Learner, Episodic Controller, And Transformer All In One Consolidated Lifelong Memory Architecture
 
