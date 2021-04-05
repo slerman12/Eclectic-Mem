@@ -1,4 +1,6 @@
-# Eclectic: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control
+# Eclectic: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control Tasks
+
+Eclectic: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control
 
 Eclectic: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous Control
 
