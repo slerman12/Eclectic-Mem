@@ -1,4 +1,4 @@
-# import imageio  TODO uncomment; only commented out due to compatibility with macbook
+import imageio  # TODO uncomment; only commented out due to compatibility with macbook
 import os
 import numpy as np
 

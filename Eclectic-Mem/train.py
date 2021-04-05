@@ -157,6 +157,10 @@ def main():
     os.environ['MJLIB_PATH'] = '/u/slerman/.mujoco/mujoco200_linux/bin/libmujoco200.so'
     os.environ['CUDA_VISIBLE_DEVICES'] = '3'
     os.environ['MJKEY_PATH'] = '/u/slerman/.mujoco/mjkey.txt'
+
+    # os.environ['MJLIB_PATH'] = '~/Code/Libraries/mujoco200_macos/bin/libmujoco200.dylib'
+    # os.environ['CUDA_VISIBLE_DEVICES'] = '3'
+    # os.environ['MJKEY_PATH'] = '~/Code/Libraries/mujoco200_macos/bin/mjkey.txt'
     args = parse_args()
     if args.seed == -1:
         args.__dict__["seed"] = np.random.randint(1, 1000000)
