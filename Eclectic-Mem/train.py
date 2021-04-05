@@ -153,10 +153,10 @@ def make_agent(obs_shape, action_shape, args, device):
 
 
 def main():
-    os.environ['LD_LIBRARY_PATH'] = '/u/jbi5/.mujoco/mujoco200/bin:/usr/lib/nvidia-440'
-    os.environ['MJLIB_PATH'] = '/u/jbi5/.mujoco/mujoco200_linux/bin/libmujoco200.so'
+    os.environ['LD_LIBRARY_PATH'] = '/u/slerman/.mujoco/mujoco200/bin:/usr/lib/nvidia-440'
+    os.environ['MJLIB_PATH'] = '/u/slerman/.mujoco/mujoco200_linux/bin/libmujoco200.so'
     os.environ['CUDA_VISIBLE_DEVICES'] = '3'
-    os.environ['MJKEY_PATH'] = '/u/jbi5/.mujoco/mjkey_retina.txt'
+    os.environ['MJKEY_PATH'] = '/u/slerman/.mujoco/mjkey_retina.txt'
     args = parse_args()
     if args.seed == -1:
         args.__dict__["seed"] = np.random.randint(1, 1000000)
