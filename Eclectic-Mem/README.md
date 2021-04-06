@@ -1,5 +1,7 @@
 # Eclectic Memory: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control 
 
+Eclectic Memory: An Eclectic Mix Of Contrastive Learning, Episodic Control, nd Transformer-Style Self-Attention In Continuous Control
+
 Eclectic Memory: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Memory-Based Control 
 
 Eclectic Memory: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control AGI Tasks
