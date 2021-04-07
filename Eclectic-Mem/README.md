@@ -1,5 +1,7 @@
 # Eclectic Memory: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control 
 
+Eclectic-Mem: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Memory-Based Expectation Maximization
+
 Eclectic-Mem: An Eclectic Mix Of Contrastive Learning, Episodic Control, And Transformer-Style Self-Attention In Continuous Control
 
 Eclectic Memory: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Memory-Based Control 
