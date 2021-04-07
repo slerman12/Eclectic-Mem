@@ -1,6 +1,34 @@
-# CURL: Contrastive Unsupervised Representation Learning for Sample-Efficient Reinforcement Learning
+# Eclectic Memory: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control 
 
-This repository is the official implementation of [CURL](https://mishalaskin.github.io/curl/) for the DeepMind control experiments. Atari experiments were done in a separate codebase available [here](https://github.com/aravindsrinivas/curl_rainbow). Our implementation of SAC is based on [SAC+AE](https://github.com/denisyarats/pytorch_sac_ae) by Denis Yarats. 
+Eclectic-Mem: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Memory-Based Expectation Maximization
+
+Eclectic-Mem: An Eclectic Mix Of Contrastive Learning, Episodic Control, And Transformer-Style Self-Attention In Continuous Control
+
+Eclectic Memory: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Memory-Based Control 
+
+Eclectic Memory: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control AGI Tasks
+
+Eclectic Memory: Efficient Contrastive-Learner-Episodic-Controller-Transformer In Continuous Control Tasks
+
+Eclectic Memory: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control RL Tasks
+
+Eclectic Memory: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control Locomotive Generalization
+
+Eclectic: Efficient Contrastive Learner Episodic Controller Transformer In Continuous Control
+
+Eclectic: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous Control
+
+Eclectic: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous Action Spaces
+
+Eclectic-Mem: Efficient Contrastive Learner, Episodic Controller, And Transformer All In One Consolidated Lifelong Memory Architecture
+
+Eclectic-Mem: Efficient Contrastive Learner, Episodic Controller, Transformer, And Continuous Controller All In One Consolidated Lifelong Memory Architecture
+
+Eclectic-Mem: Efficient Contrastive Learner, Episodic Controller, And Transformer In Continuous-Control-Continual-General-Few-Shot-Meta-RL MDPs
+
+Eclectic-Mem: Efficient Contrastive Learning For Episodic Control By Time Irregular Concepts To Memory
+
+This repository is an extension of [CURL](https://mishalaskin.github.io/curl/) for the DeepMind control experiments. Atari experiments were done in a separate codebase available [here](https://github.com/aravindsrinivas/curl_rainbow). Implementation of SAC is based on [SAC+AE](https://github.com/denisyarats/pytorch_sac_ae) by Denis Yarats. 
 
 ## Installation 
 
@@ -11,7 +39,7 @@ conda env create -f conda_env.yml
 ```
 
 ## Instructions
-To train a CURL agent on the `cartpole swingup` task from image-based observations run `bash script/run.sh` from the root of this directory. The `run.sh` file contains the following command, which you can modify to try different environments / hyperparamters.
+To train an Eclectic agent on the `cartpole swingup` task from image-based observations run `bash script/run.sh` from the root of this directory. The `run.sh` file contains the following command, which you can modify to try different environments / hyperparamters.
 ```
 CUDA_VISIBLE_DEVICES=0 python train.py \
     --domain_name cartpole \
@@ -32,8 +60,6 @@ In your console, you should see printouts that look like:
 | train | E: 229 | S: 29000 | D: 18.8 s | R: 683.6702 | BR: 3.7384 | A_LOSS: -311.3941 | CR_LOSS: 140.2573 | CU_LOSS: 0.0000
 | train | E: 233 | S: 29500 | D: 19.6 s | R: 838.0947 | BR: 3.7254 | A_LOSS: -316.9415 | CR_LOSS: 136.5304 | CU_LOSS: 0.0000
 ```
-
-For reference, the maximum score for cartpole swing up is around 845 pts, so CURL has converged to the optimal score. This takes about an hour of training depending on your GPU. 
 
 Log abbreviation mapping:
 
