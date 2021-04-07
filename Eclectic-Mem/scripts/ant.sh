@@ -1,6 +1,6 @@
-CUDA_VISIBLE_DEVICES=3 python train.py \
-    --domain_name finger \
-    --task_name spin \
+CUDA_VISIBLE_DEVICES=1 python train.py \
+    --domain_name quadruped \
+    --task_name walk \
     --encoder_type pixel \
     --action_repeat 8 \
     --save_tb --pre_transform_image_size 100 --image_size 84 \

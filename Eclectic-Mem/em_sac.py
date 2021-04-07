@@ -174,10 +174,12 @@ class Critic(nn.Module):
         if self.memory is None:
             c_prime = c
         else:
+            #
             c_prime = self.memory(c)
 
-        q1 = self.Q1(c, action)
-        q2 = self.Q2(c, action)
+        # TODO try just differentiable similarity-weighted average of recalled memory values!
+        q1 = self.Q1(c_prime, action)
+        q2 = self.Q2(c_prime, action)
 
         self.outputs['q1'] = q1
         self.outputs['q2'] = q2
@@ -449,7 +451,9 @@ class EclecticMemCurlSacAgent(object):
         if self.critic.memory is not None:
             # note: could also add c_prime and c_prime_next
             # mem = {"c": c, "c_next": c_next, "r": reward, "q": target_Q, "a": action, "d": not_done, "step": step}
-            mem = {"c": c, "c_next": c_next, "r": reward, "q": target_Q, "a": action, "d": not_done}
+            mem = {"c": c,
+                   # "c_next": c_next,
+                   "r": reward, "q": target_Q, "a": action, "d": not_done}
             self.critic.memory.add(**mem)
 
         # Optimize the critic
