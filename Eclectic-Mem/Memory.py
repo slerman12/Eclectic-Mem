@@ -73,7 +73,7 @@ class Memory(Module):
                 metadata = self.memory[key][indices]  # B x k x mem_size
                 result.append(metadata)
         if action is not None:
-            result.append(action[None, None, :].expand(deltas.shape[0], k, -1))
+            result.append(action[:, None, :].expand(-1, k, -1))
 
         self._j = (self._j + 1) % self.j
 
