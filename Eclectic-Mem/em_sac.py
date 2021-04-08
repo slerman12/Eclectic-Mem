@@ -314,9 +314,9 @@ class EclecticMemCurlSacAgent(object):
             log_interval=100,
             detach_encoder=False,
             curl_latent_dim=128,
-            em_N=800,
-            em_j=2,
-            em_k=10,
+            em_N=5000,
+            em_j=1,
+            em_k=80,
             em_weigh_q=False,
             em_key_size=32,
             em_num_heads=1
@@ -457,7 +457,7 @@ class EclecticMemCurlSacAgent(object):
             # mem = {"c": c, "c_next": c_next, "r": reward, "q": target_Q, "a": action, "d": not_done, "step": step}
             mem = {"c": c,
                    # "c_next": c_next,
-                   "r": reward, "q": target_Q, "a": action, "d": not_done}
+                   "r": reward, "q": target_Q.detach(), "a": action.detach(), "d": not_done}
             self.critic.memory.add(**mem)
 
         # Optimize the critic
