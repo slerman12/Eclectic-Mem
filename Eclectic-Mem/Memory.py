@@ -38,7 +38,6 @@ class Memory(Module):
         for key in kwargs:
             assert kwargs[key].shape[0] == batch_size  # batches only
             # get current memories for key or set default
-            print(key, kwargs[key].shape)
             memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]).to(self.device))
             # append new memories to them
             new_memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size])).to(self.device)
@@ -66,8 +65,8 @@ class Memory(Module):
         deltas, indices = torch.topk(deltas, k=k, dim=1, sorted=False)  # B x k
         expected_q = None
         if weigh_q:
-            # B x k x 1, B * k -> B
-            expected_q = (self.q[indices].squeeze(-1) * deltas).sum(-1)
+            # B x k x 1, B * k -> B x 1
+            expected_q = (self.q[indices].squeeze(-1) * deltas).sum(-1).unsqueeze(-1)
         assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == k  # todo debugging check, can delete
 
         result = [deltas.unsqueeze(dim=2)]
