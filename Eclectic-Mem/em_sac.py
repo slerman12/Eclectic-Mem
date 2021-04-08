@@ -180,8 +180,8 @@ class Critic(nn.Module):
         # TODO try just differentiable similarity-weighted average of recalled memory values!
         # TODO try c into one, c_prime into other
         # note: this is just a test; without c, critic gradients don't propagate into the visual features
-        q1 = self.Q1(c_prime, action)
-        q2 = self.Q2(c_prime, action)
+        q1 = self.Q1(c, action)
+        q2 = self.Q2(c, action)
 
         self.outputs['q1'] = q1
         self.outputs['q2'] = q2
@@ -389,7 +389,8 @@ class EclecticMemCurlSacAgent(object):
             )
 
             # create EclecticMem
-            self.EclecticMem = EclecticMem(delta=self.CURL.compute_logits, N=em_N, j=em_j, k=em_k, weigh_q=em_weigh_q,
+            self.EclecticMem = EclecticMem(delta=self.CURL.compute_logits, N=em_N, residual=False,
+                                           j=em_j, k=em_k, weigh_q=em_weigh_q,
                                            c_size=encoder_feature_dim).to(self.device)
 
             self.critic.memory = self.EclecticMem
