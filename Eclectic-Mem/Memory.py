@@ -4,7 +4,7 @@ from torch.nn import Module
 
 
 class Memory(Module):
-    def __init__(self, N, c_size, j=2, key_size=32, num_heads=1):
+    def __init__(self, N, c_size, j=1, key_size=32, num_heads=1):
         '''
         N: Memory max size
         j: time between updates
@@ -35,15 +35,11 @@ class Memory(Module):
         if "t" not in kwargs:
             kwargs["t"] = torch.tensor([time.time()] * batch_size)
         for key in kwargs:
-            # if key != 'step':
             assert kwargs[key].shape[0] == batch_size
             memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]))
-            # torch.cat supposedly faster:
-            # (https://stackoverflow.com/questions/51761806/is-it-possible-to-create-a-fifo-queue-with-pytorch)
             new_memory = torch.cat((kwargs[key].to(memory.device), memory[:-batch_size])).to('cuda:0')
             setattr(self, key, new_memory)
             self.memory[key] = self.__dict__[key]
-        # print(self.c.shape[0], self.n)
         assert self.c.shape[0] >= self.n  # todo debugging check, can delete
 
         #  todo raise error if not all memory keys included in kwargs
@@ -60,6 +56,7 @@ class Memory(Module):
         '''
 
         k = min(k, self.n)
+        # Should we detach tau from teh graph?
         tau = delta(c, self.c[:self.n])
         if weigh_q:
             tau = self.q[None, :self.n] * tau
@@ -70,8 +67,12 @@ class Memory(Module):
 
         result = [deltas.unsqueeze(dim=2)]
         for key in self.memory:
-            result.append(self.memory[key][indices])  # B x k x mem_size
-        result[-1] = result[-1].unsqueeze(dim=2)
+            if key != "c":
+                metadata = self.memory[key][indices]
+                if key == "d":
+                    metadata = metadata.unsqueeze(dim=2)
+                result.append(metadata)  # B x k x mem_size
+        result.append(tau[indices].unsqueeze(dim=2))
 
         self._j = (self._j + 1) % self.j
 
