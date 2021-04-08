@@ -161,7 +161,10 @@ class Memory(Module):
         delta: CL embed function
         '''
         if self.n == 0:
-            return c
+            if return_expected_q:
+                return 0
+            else:
+                return c
         if self._j == 0 or c.shape[0] == 1 or return_expected_q:
             metadata, expected_q = self._query(c, k, delta, weigh_q or return_expected_q, action=action)
             if return_expected_q:

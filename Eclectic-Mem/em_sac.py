@@ -181,8 +181,6 @@ class Critic(nn.Module):
         q1 = expected_q
         q2 = self.Q2(c, action)
 
-        print(q1.shape, q2.shape)
-
         self.outputs['q1'] = q1
         self.outputs['q2'] = q2
 
