@@ -64,6 +64,7 @@ class Memory(Module):
         expected_q = None
         if weigh_q:
             # B x k x 1, B * k -> B
+            print(self.q.shape, self.q[indices].shape, self.q[indices].squeeze(-1).shape, deltas.shape)
             expected_q = (self.q[indices].squeeze(-1) * deltas).sum(-1)
         assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == k  # todo debugging check, can delete
 
