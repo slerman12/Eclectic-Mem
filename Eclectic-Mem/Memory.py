@@ -62,8 +62,7 @@ class Memory(Module):
             tau = self.q[None, :self.n] * tau
         deltas, indices = torch.topk(tau, k=k, dim=1, sorted=False)
         assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == k  # todo debugging check, can delete
-        print(tau.shape)
-        assert False
+        assert tau.shape[0] == self.n
 
         result = [deltas.unsqueeze(dim=2)]
         for key in self.memory:
