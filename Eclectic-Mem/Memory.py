@@ -33,7 +33,7 @@ class Memory(Module):
             raise TypeError("add() missing 1 required tensor argument: c")
 
         if "t" not in kwargs:
-            kwargs["t"] = torch.tensor([time.time()] * batch_size)
+            kwargs["t"] = torch.tensor([time.time()] * batch_size).unsqueeze(dim=1)
         for key in kwargs:
             assert kwargs[key].shape[0] == batch_size
             memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]))
@@ -61,21 +61,16 @@ class Memory(Module):
         if weigh_q:
             tau = self.q[None, :self.n] * tau
         deltas, indices = torch.topk(tau, k=k, dim=1, sorted=False)
-        print(deltas.shape, indices.shape)
-        # deltas.shape[0]
-        # print(deltas.shape[0], c.shape[0], deltas.shape[1], self.c.shape[0], self.c.shape)
         assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == k  # todo debugging check, can delete
+        print(tau.shape)
+        assert False
 
         result = [deltas.unsqueeze(dim=2)]
         for key in self.memory:
             if key != "c":
                 metadata = self.memory[key][indices]
-                print(key, metadata.shape)
-                if key == "d":
-                    metadata = metadata.unsqueeze(dim=2)
                 result.append(metadata)  # B x k x mem_size
-        print(tau[indices].shape)
-        result.append(tau[indices])
+        result.append(deltas)
 
         self._j = (self._j + 1) % self.j
 
