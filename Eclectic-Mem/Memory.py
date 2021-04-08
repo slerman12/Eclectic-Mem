@@ -38,6 +38,7 @@ class Memory(Module):
         for key in kwargs:
             assert kwargs[key].shape[0] == batch_size  # batches only
             # get current memories for key or set default
+            print(key, kwargs[key].shape)
             memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]).to(self.device))
             # append new memories to them
             new_memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size])).to(self.device)
