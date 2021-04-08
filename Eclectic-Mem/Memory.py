@@ -57,7 +57,7 @@ class Memory(Module):
 
         k = min(k, self.n)
         # Should we detach tau from the graph?
-        tau = delta(c, self.c[:self.n])
+        tau = delta(c, self.c[:self.n]).detach()
         if weigh_q:
             tau = self.q[None, :self.n] * tau
         deltas, indices = torch.topk(tau, k=k, dim=1, sorted=False)

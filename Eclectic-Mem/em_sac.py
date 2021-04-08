@@ -256,7 +256,7 @@ class CURL(nn.Module):
 
 
 class EclecticMem(Memory):
-    def __init__(self, delta, c_size, N=800, residual=True, j=1, k=10, weigh_q=False):
+    def __init__(self, delta, c_size, N=800, residual=False, j=1, k=10, weigh_q=False):
         super().__init__(N=N, c_size=c_size, j=j)
         self.delta = delta
         self.residual = residual
@@ -275,6 +275,7 @@ class EclecticMem(Memory):
 
         if self.residual:
             c_prime = c_prime + c
+            assert False  # TODO can delete; for debugging
 
         if detach:
             c_prime = c_prime.detach()
