@@ -67,7 +67,7 @@ class Memory(Module):
         expected_q = None
         if weigh_q:
             # B x k x 1, B * k -> B x 1
-            expected_q = (self.q[indices].squeeze(-1) * deltas).sum(-1).unsqueeze(-1)
+            expected_q = (self.q[indices].squeeze(-1) * torch.softmax(deltas, dim=1)).sum(-1).unsqueeze(-1)
         assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == k  # todo debugging check, can delete
 
         result = [deltas.unsqueeze(dim=2)]

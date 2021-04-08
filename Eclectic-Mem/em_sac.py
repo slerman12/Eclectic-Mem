@@ -172,7 +172,6 @@ class Critic(nn.Module):
 
         expected_q = self.memory(c, action=action,
                                  detach_deltas=True, return_expected_q=True)
-        print(expected_q.mean())
         # c_prime = self.memory(c)
 
         # TODO try just differentiable similarity-weighted average of recalled memory values!
