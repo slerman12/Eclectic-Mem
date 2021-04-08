@@ -171,7 +171,7 @@ class Critic(nn.Module):
         c = self.encoder(obs, detach=detach_encoder)
 
         expected_q = self.memory(c, action=action,
-                                 detach_deltas=True, return_expected_q=True)
+                                 detach_deltas=False, return_expected_q=True)
         # c_prime = self.memory(c)
 
         # TODO try just differentiable similarity-weighted average of recalled memory values!
