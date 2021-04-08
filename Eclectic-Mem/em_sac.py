@@ -178,6 +178,8 @@ class Critic(nn.Module):
             c_prime = self.memory(c)
 
         # TODO try just differentiable similarity-weighted average of recalled memory values!
+        # TODO try c into one, c_prime into other
+        # note: this is just a test; without c, critic gradients don't propagate into the visual features
         q1 = self.Q1(c_prime, action)
         q2 = self.Q2(c_prime, action)
 
