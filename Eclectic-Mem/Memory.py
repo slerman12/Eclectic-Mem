@@ -56,20 +56,19 @@ class Memory(Module):
         '''
 
         k = min(k, self.n)
-        # Should we detach tau from teh graph?
+        # Should we detach tau from the graph?
         tau = delta(c, self.c[:self.n])
         if weigh_q:
             tau = self.q[None, :self.n] * tau
         deltas, indices = torch.topk(tau, k=k, dim=1, sorted=False)
         assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == k  # todo debugging check, can delete
-        assert tau.shape[0] == self.n
+        assert tau.shape[0] == self.n # todo debugging check, can delete
 
         result = [deltas.unsqueeze(dim=2)]
         for key in self.memory:
             if key != "c":
                 metadata = self.memory[key][indices]
                 result.append(metadata)  # B x k x mem_size
-        result.append(deltas)
 
         self._j = (self._j + 1) % self.j
 
