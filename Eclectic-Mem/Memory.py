@@ -162,7 +162,7 @@ class Memory(Module):
         if self.n == 0:
             return c
         if self._j == 0 or c.shape[0] == 1 or return_expected_q:
-            metadata, expected_q = self._query(c, k, delta, weigh_q, action=action)
+            metadata, expected_q = self._query(c, k, delta, weigh_q or return_expected_q, action=action)
             if return_expected_q:
                 return expected_q
             self.set_qkv_encoder(metadata)
