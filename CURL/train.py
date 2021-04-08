@@ -6,12 +6,14 @@ import time
 
 import dmc2gym
 import numpy as np
+import socket
 import torch
 
 import curl_utils
 from curl_sac import CurlSacAgent
 from logger import Logger
 from video import VideoRecorder
+from clearml import Task
 
 
 def parse_args():
@@ -19,6 +21,7 @@ def parse_args():
     # environment
     parser.add_argument('--domain_name', default='cartpole')
     parser.add_argument('--task_name', default='swingup')
+    parser.add_argument('--expname', default=None)
     parser.add_argument('--pre_transform_image_size', default=100, type=int)
 
     parser.add_argument('--image_size', default=84, type=int)
@@ -148,13 +151,19 @@ def make_agent(obs_shape, action_shape, args, device):
 
 
 def main(rank):
-    os.environ['MASTER_ADDR'] = 'localhost'
-    os.environ['MASTER_PORT'] = '29500'
-    # os.environ['MUJOCO_GL'] = 'osmesa'
-    os.environ['LD_LIBRARY_PATH'] = '/u/jbi5/.mujoco/mujoco200/bin:/usr/lib/nvidia-440'
-    os.environ['MJLIB_PATH'] = '/u/jbi5/.mujoco/mujoco200_linux/bin/libmujoco200.so'
-    os.environ['MJKEY_PATH'] = '/u/jbi5/.mujoco/mjkey.txt'
+    from pathlib import Path
+    os.environ['LD_LIBRARY_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin:/usr/lib/nvidia-440')
+    os.environ['MJLIB_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin/libmujoco200.so')
+    os.environ['MJKEY_PATH'] = str(Path.home() / f'.mujoco/mjkey_{socket.getfqdn()}.txt')
+    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
     args = parse_args()
+
+    snapshots_path = Path('./experiments')
+    snapshots_path.mkdir(parents=True, exist_ok=True)
+    Task.init(project_name="Eclectic-Mem",
+              task_name=f"{args.domain_name}-{args.task_name}" if not args.expname else args.expname,
+              output_uri=str(snapshots_path))
+
     if args.seed == -1:
         args.__dict__["seed"] = np.random.randint(1, 1000000)
     curl_utils.set_seed_everywhere(args.seed)

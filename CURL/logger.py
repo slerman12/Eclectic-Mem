@@ -7,6 +7,7 @@ import torch
 import torchvision
 import numpy as np
 from termcolor import colored
+from clearml import Logger as TrainLogger
 
 FORMAT_CONFIG = {
     'rl': {
@@ -41,6 +42,7 @@ class MetersGroup(object):
             os.remove(file_name)
         self._formating = formating
         self._meters = defaultdict(AverageMeter)
+        self.trains_logger = TrainLogger.current_logger()
 
     def log(self, key, value, n=1):
         self._meters[key].update(value, n)
@@ -74,10 +76,18 @@ class MetersGroup(object):
         return template % (key, value)
 
     def _dump_to_console(self, data, prefix):
+        prefix_text = prefix
         prefix = colored(prefix, 'yellow' if prefix == 'train' else 'green')
         pieces = ['{:5}'.format(prefix)]
+        changedict = {
+            'episode_reward': 'Reward'
+        }
         for key, disp_key, ty in self._formating:
             value = data.get(key, 0)
+            if key != 'episode' and key != 'step' and key != 'duration':
+                self.trains_logger.report_scalar('Training' if prefix_text == 'train' else prefix_text,
+                                                 changedict.get(key, key),
+                                                 iteration=data.get('step', 0), value=value)
             pieces.append(self._format(disp_key, value, ty))
         print('| %s' % (' | '.join(pieces)))
 
