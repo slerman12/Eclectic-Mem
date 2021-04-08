@@ -37,6 +37,7 @@ class Memory(Module):
         self.time += 0.001
         for key in kwargs:
             assert kwargs[key].shape[0] == batch_size  # batches only
+            assert len(kwargs[key].shape) >= 2  # include non-batch dim
             # get current memories for key or set default
             memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]).to(self.device))
             # append new memories to them
