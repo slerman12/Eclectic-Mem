@@ -1,5 +1,3 @@
-import time
-import torch
 from torch.nn import Module
 
 
@@ -19,9 +17,9 @@ class Memory(Module):
         self.key_size = key_size
         self.head_size = c_size
         self.c_size = c_size
-        # print(c_size, total_size, self.qkv_size)
         self.qkv_encoder = None
         self.num_heads = num_heads
+        self.time = 0.001
 
     def add(self, **kwargs):
         '''
@@ -33,7 +31,8 @@ class Memory(Module):
             raise TypeError("add() missing 1 required tensor argument: c")
 
         if "t" not in kwargs:
-            kwargs["t"] = torch.tensor([time.time()] * batch_size).unsqueeze(dim=1)
+            kwargs["t"] = torch.tensor([self.time] * batch_size).unsqueeze(dim=1)
+        self.time += 0.001
         for key in kwargs:
             assert kwargs[key].shape[0] == batch_size
             memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]))
