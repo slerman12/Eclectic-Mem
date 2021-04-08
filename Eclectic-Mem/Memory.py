@@ -163,7 +163,7 @@ class Memory(Module):
         '''
         if self.n == 0:
             if return_expected_q:
-                return torch.tensor([0]).to(self.device)
+                return torch.zeros(c.shape[0], 1).to(self.device)
             else:
                 return c
         if self._j == 0 or c.shape[0] == 1 or return_expected_q:
