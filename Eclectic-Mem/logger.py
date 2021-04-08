@@ -76,7 +76,9 @@ class MetersGroup(object):
         return template % (key, value)
 
     def _dump_to_console(self, data, prefix):
+        # prefix_text = 'Training' if prefix == 'train' else prefix
         prefix_text = prefix
+        print(prefix_text)
         prefix = colored(prefix, 'yellow' if prefix == 'train' else 'green')
         pieces = ['{:5}'.format(prefix)]
         changedict = {
@@ -85,7 +87,7 @@ class MetersGroup(object):
         for key, disp_key, ty in self._formating:
             value = data.get(key, 0)
             if key != 'episode' and key != 'step' and key != 'duration':
-                self.trains_logger.report_scalar('Training' if prefix_text == 'train' else prefix_text,
+                self.trains_logger.report_scalar(prefix_text,
                                                  changedict.get(key, key),
                                                  iteration=data.get('step', 0), value=value)
             pieces.append(self._format(disp_key, value, ty))
