@@ -442,14 +442,15 @@ class EclecticMemCurlSacAgent(object):
         with torch.no_grad():
             # TODO can compute similarity-weighted past q-values but otherwise output from c, no c_prime
             _, policy_action, log_pi, _ = self.actor(next_obs)
-            target_Q1, target_Q2, c_next, c_prime_next = self.critic_target(next_obs, policy_action, return_c=True)
+            # target_Q1, target_Q2, c_next, c_prime_next = self.critic_target(next_obs, policy_action, return_c=True)
+            target_Q1, target_Q2, c_next = self.critic_target(next_obs, policy_action, return_c=True)
             target_V = torch.min(target_Q1,
                                  target_Q2) - self.alpha.detach() * log_pi
             target_Q = reward + (not_done * self.discount * target_V)
 
         # get current Q estimates
-        current_Q1, current_Q2, c, c_prime = self.critic(
-            obs, action, detach_encoder=self.detach_encoder, return_c=True)
+        # current_Q1, current_Q2, c, c_prime = self.critic(obs, action, detach_encoder=self.detach_encoder, return_c=True)
+        current_Q1, current_Q2, c = self.critic(obs, action, detach_encoder=self.detach_encoder, return_c=True)
         # TODO can add similarity-weighted past q-values mse_loss with q-target, but how does that benefit? Doesn't
         # TODO can adapt faster than parametric critic, so maybe could substitute one of the Qs here
         # TODO so substitute Q1, keep fully-parametric Q2; since don't want unseen states to be overestimated, take min
