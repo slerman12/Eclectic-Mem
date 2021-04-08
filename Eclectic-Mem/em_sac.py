@@ -180,6 +180,7 @@ class Critic(nn.Module):
         # TODO try just differentiable similarity-weighted average of recalled memory values!
         # TODO try c into one, c_prime into other
         # note: this is just a test; without c, critic gradients don't propagate into the visual features
+        # why does changing to c_prime cause error?
         q1 = self.Q1(c, action)
         q2 = self.Q2(c, action)
 
@@ -255,7 +256,7 @@ class CURL(nn.Module):
 
 
 class EclecticMem(Memory):
-    def __init__(self, delta, c_size, N=800, residual=True, j=2, k=10, weigh_q=False):
+    def __init__(self, delta, c_size, N=800, residual=False, j=1, k=10, weigh_q=False):
         super().__init__(N=N, c_size=c_size, j=j)
         self.delta = delta
         self.residual = residual
@@ -274,6 +275,7 @@ class EclecticMem(Memory):
 
         if self.residual:
             c_prime = c_prime + c
+            assert False  # TODO can delete; for debugging
 
         if detach:
             c_prime = c_prime.detach()
@@ -313,9 +315,9 @@ class EclecticMemCurlSacAgent(object):
             log_interval=100,
             detach_encoder=False,
             curl_latent_dim=128,
-            em_N=800,
-            em_j=2,
-            em_k=10,
+            em_N=5000,
+            em_j=1,
+            em_k=80,
             em_weigh_q=False,
             em_key_size=32,
             em_num_heads=1
@@ -454,9 +456,10 @@ class EclecticMemCurlSacAgent(object):
         if self.critic.memory is not None:
             # note: could also add c_prime and c_prime_next
             # mem = {"c": c, "c_next": c_next, "r": reward, "q": target_Q, "a": action, "d": not_done, "step": step}
+            # TODO needs a sense of time within the episode (how far from the terminal state) since that affects q-value
             mem = {"c": c,
                    # "c_next": c_next,
-                   "r": reward, "q": target_Q, "a": action, "d": not_done}
+                   "r": reward, "q": target_Q.detach(), "a": action.detach(), "d": not_done}
             self.critic.memory.add(**mem)
 
         # Optimize the critic

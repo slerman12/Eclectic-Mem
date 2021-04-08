@@ -1,10 +1,8 @@
-import time
-import torch
 from torch.nn import Module
 
 
 class Memory(Module):
-    def __init__(self, N, c_size, j=2, key_size=32, num_heads=1):
+    def __init__(self, N, c_size, j=1, key_size=32, num_heads=1):
         '''
         N: Memory max size
         j: time between updates
@@ -19,9 +17,9 @@ class Memory(Module):
         self.key_size = key_size
         self.head_size = c_size
         self.c_size = c_size
-        # print(c_size, total_size, self.qkv_size)
         self.qkv_encoder = None
         self.num_heads = num_heads
+        self.time = 0.001
 
     def add(self, **kwargs):
         '''
@@ -33,17 +31,14 @@ class Memory(Module):
             raise TypeError("add() missing 1 required tensor argument: c")
 
         if "t" not in kwargs:
-            kwargs["t"] = torch.tensor([time.time()] * batch_size)
+            kwargs["t"] = torch.tensor([self.time] * batch_size).unsqueeze(dim=1)
+        self.time += 0.001
         for key in kwargs:
-            # if key != 'step':
             assert kwargs[key].shape[0] == batch_size
             memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]))
-            # torch.cat supposedly faster:
-            # (https://stackoverflow.com/questions/51761806/is-it-possible-to-create-a-fifo-queue-with-pytorch)
             new_memory = torch.cat((kwargs[key].to(memory.device), memory[:-batch_size])).to('cuda:0')
             setattr(self, key, new_memory)
             self.memory[key] = self.__dict__[key]
-        # print(self.c.shape[0], self.n)
         assert self.c.shape[0] >= self.n  # todo debugging check, can delete
 
         #  todo raise error if not all memory keys included in kwargs
@@ -60,18 +55,19 @@ class Memory(Module):
         '''
 
         k = min(k, self.n)
-        tau = delta(c, self.c[:self.n])
+        # Should we detach tau from the graph?
+        tau = delta(c, self.c[:self.n]).detach()
         if weigh_q:
             tau = self.q[None, :self.n] * tau
         deltas, indices = torch.topk(tau, k=k, dim=1, sorted=False)
-        # deltas.shape[0]
-        # print(deltas.shape[0], c.shape[0], deltas.shape[1], self.c.shape[0], self.c.shape)
         assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == k  # todo debugging check, can delete
+        assert tau.shape[1] == self.n  # todo debugging check, can delete
 
         result = [deltas.unsqueeze(dim=2)]
         for key in self.memory:
-            result.append(self.memory[key][indices])  # B x k x mem_size
-        result[-1] = result[-1].unsqueeze(dim=2)
+            if key != "c":
+                metadata = self.memory[key][indices]
+                result.append(metadata)  # B x k x mem_size
 
         self._j = (self._j + 1) % self.j
 
