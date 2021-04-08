@@ -72,7 +72,8 @@ class Memory(Module):
                 if key == "d":
                     metadata = metadata.unsqueeze(dim=2)
                 result.append(metadata)  # B x k x mem_size
-        result.append(tau[indices].unsqueeze(dim=2))
+        print(tau[indices].shape)
+        result.append(tau[indices])
 
         self._j = (self._j + 1) % self.j
 
