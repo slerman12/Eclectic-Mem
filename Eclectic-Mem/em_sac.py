@@ -79,8 +79,7 @@ class Actor(nn.Module):
     ):
         c = self.encoder(obs, detach=detach_encoder)
 
-        if self.memory is not None:
-            c = self.memory(c, detach=detach_encoder)
+        # c = self.memory(c, detach=detach_encoder)
 
         mu, log_std = self.trunk(c).chunk(2, dim=-1)
 
@@ -171,17 +170,15 @@ class Critic(nn.Module):
         # detach_encoder allows to stop gradient propogation to encoder
         c = self.encoder(obs, detach=detach_encoder)
 
-        if self.memory is None:
-            c_prime = c
-        else:
-            #
-            c_prime = self.memory(c)
+        expected_q = self.memory(c, action=action, detach_deltas=False, return_expected_q=True)
+        # c_prime = self.memory(c)
 
         # TODO try just differentiable similarity-weighted average of recalled memory values!
         # TODO try c into one, c_prime into other
         # note: this is just a test; without c, critic gradients don't propagate into the visual features
         # why does changing to c_prime cause error?
-        q1 = self.Q1(c, action)
+        # q1 = self.Q1(c, action)
+        q1 = expected_q
         q2 = self.Q2(c, action)
 
         self.outputs['q1'] = q1
@@ -189,8 +186,9 @@ class Critic(nn.Module):
 
         if return_c:
             self.outputs['c'] = c
-            self.outputs['c_prime'] = c_prime
-            return q1, q2, c, c_prime
+            # self.outputs['c_prime'] = c_prime
+            # return q1, q2, c, c_prime
+            return q1, q2, c
 
         return q1, q2
 
@@ -249,6 +247,8 @@ class CURL(nn.Module):
         - negatives are all other elements
         - to compute loss use multiclass cross entropy with identity matrix for labels
         """
+        # TODO euclidean distance like NEC
+        # TODO add action encodings to the CL (store encodings in memory instead of actions)
         Wz = torch.matmul(self.W, z_pos.T)  # (z_dim,B)
         logits = torch.matmul(z_a, Wz)  # (B,B)
         logits = logits - torch.max(logits, 1)[0][:, None]
@@ -263,7 +263,7 @@ class EclecticMem(Memory):
         self.k = k
         self.weigh_q = weigh_q
 
-    def forward(self, c, detach=False):
+    def forward(self, c, detach=False, action=None, detach_deltas=True, return_expected_q=False):
         '''
         :param c: concept to encode
         :param detach: whether to detach from comp graph
@@ -271,7 +271,9 @@ class EclecticMem(Memory):
         :return: c_prime: post-memory representation
         '''
 
-        c_prime = super().forward(c, self.k, self.delta, self.weigh_q)
+        c_prime = super().forward(c, self.k, self.delta, self.weigh_q,
+                                  action=action, detach_deltas=detach_deltas,
+                                  return_expected_q=return_expected_q)
 
         if self.residual:
             c_prime = c_prime + c
@@ -438,6 +440,7 @@ class EclecticMemCurlSacAgent(object):
 
     def update_critic(self, obs, action, reward, next_obs, not_done, L, step):
         with torch.no_grad():
+            # TODO can compute similarity-weighted past q-values but otherwise output from c, no c_prime
             _, policy_action, log_pi, _ = self.actor(next_obs)
             target_Q1, target_Q2, c_next, c_prime_next = self.critic_target(next_obs, policy_action, return_c=True)
             target_V = torch.min(target_Q1,
@@ -447,6 +450,10 @@ class EclecticMemCurlSacAgent(object):
         # get current Q estimates
         current_Q1, current_Q2, c, c_prime = self.critic(
             obs, action, detach_encoder=self.detach_encoder, return_c=True)
+        # TODO can add similarity-weighted past q-values mse_loss with q-target, but how does that benefit? Doesn't
+        # TODO can adapt faster than parametric critic, so maybe could substitute one of the Qs here
+        # TODO so substitute Q1, keep fully-parametric Q2; since don't want unseen states to be overestimated, take min
+        # TODO meanwhile, actor could be parametric; just remember to feed it as metadata in critic self-attention
         critic_loss = F.mse_loss(current_Q1,
                                  target_Q) + F.mse_loss(current_Q2, target_Q)
         if step % self.log_interval == 0:
