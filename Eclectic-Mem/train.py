@@ -1,22 +1,19 @@
-import numpy as np
-import torch
 import argparse
-import os
-import math
-# import gym
-import sys
-import random
-import time
-import json
 import dmc2gym
-import copy
+import json
+import numpy as np
+import os
+# import gym
+import socket
+import time
+import torch
 
 import utils
+from em_sac import EclecticMemCurlSacAgent
 from logger import Logger
 from video import VideoRecorder
-
-from em_sac import EclecticMemCurlSacAgent
-from torchvision import transforms
+from clearml import Task
+from pathlib import Path
 
 
 def parse_args():
@@ -24,6 +21,7 @@ def parse_args():
     # environment
     parser.add_argument('--domain_name', default='finger')
     parser.add_argument('--task_name', default='spin')
+    parser.add_argument('--expname', default=None)
     parser.add_argument('--pre_transform_image_size', default=100, type=int)
 
     parser.add_argument('--image_size', default=84, type=int)
@@ -32,7 +30,7 @@ def parse_args():
     # replay buffer
     parser.add_argument('--replay_buffer_capacity', default=100000, type=int)
     # train
-    parser.add_argument('--agent', default='curl_sac', type=str)
+    parser.add_argument('--agent', default='em_sac', type=str)
     parser.add_argument('--init_steps', default=1000, type=int)
     parser.add_argument('--num_train_steps', default=250000, type=int)
     parser.add_argument('--batch_size', default=32, type=int)
@@ -153,15 +151,25 @@ def make_agent(obs_shape, action_shape, args, device):
 
 
 def main():
-    os.environ['LD_LIBRARY_PATH'] = '/u/slerman/.mujoco/mujoco200_linux/bin:/usr/lib/nvidia-440'
-    os.environ['MJLIB_PATH'] = '/u/slerman/.mujoco/mujoco200_linux/bin/libmujoco200.so'
-    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
-    os.environ['MJKEY_PATH'] = '/u/slerman/.mujoco/mjkey.txt'
+    # os.environ['LD_LIBRARY_PATH'] = '/u/slerman/.mujoco/mujoco200_linux/bin:/usr/lib/nvidia-440'
+
+    # os.environ['MJKEY_PATH'] = '/u/slerman/.mujoco/mjkey.txt'
 
     # os.environ['MJLIB_PATH'] = '~/Code/Libraries/mujoco200_macos/bin/libmujoco200.dylib'
     # os.environ['CUDA_VISIBLE_DEVICES'] = '3'
-    # os.environ['MJKEY_PATH'] = '~/Code/Libraries/mujoco200_macos/bin/mjkey.txt'
+    # os.environ['MJKEY_PATH'] = '~/Code/Libraries/mujoco200_macos/bin/mjkey.txt']
+
+    from pathlib import Path
+    os.environ['LD_LIBRARY_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin:/usr/lib/nvidia-440')
+    os.environ['MJLIB_PATH'] = str(Path.home() / '.mujoco/mujoco200/bin/libmujoco200.so')
+    os.environ['MJKEY_PATH'] = str(Path.home() / f'.mujoco/mjkey_{socket.getfqdn()}.txt')
+    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
     args = parse_args()
+    snapshots_path = Path('./experiments')
+    snapshots_path.mkdir(parents=True, exist_ok=True)
+    Task.init(project_name="Eclectic-Mem",
+              task_name=f"{args.domain_name}-{args.task_name}" if not args.expname else args.expname,
+              output_uri=str(snapshots_path))
     if args.seed == -1:
         args.__dict__["seed"] = np.random.randint(1, 1000000)
     utils.set_seed_everywhere(args.seed)
@@ -289,6 +297,5 @@ def main():
 
 
 if __name__ == '__main__':
-    torch.multiprocessing.set_start_method('spawn')
-
+    # torch.multiprocessing.set_start_method('spawn', force=True)
     main()
