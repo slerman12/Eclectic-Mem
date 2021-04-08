@@ -21,6 +21,7 @@ class Memory(Module):
         self.qkv_encoder = None
         self.num_heads = num_heads
         self.time = 0.001
+        self.device = 'cuda:0'
 
     def add(self, **kwargs):
         '''
@@ -39,7 +40,7 @@ class Memory(Module):
             # get current memories for key or set default
             memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]))
             # append new memories to them
-            new_memory = torch.cat((kwargs[key].to(memory.device), memory[:-batch_size])).to('cuda:0')
+            new_memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size])).to(self.device)
             setattr(self, key, new_memory)
             self.memory[key] = self.__dict__[key]
         assert self.c.shape[0] >= self.n  # todo debugging check, can delete
@@ -162,7 +163,7 @@ class Memory(Module):
         '''
         if self.n == 0:
             if return_expected_q:
-                return torch.tensor([0])
+                return torch.tensor([0]).to(self.device)
             else:
                 return c
         if self._j == 0 or c.shape[0] == 1 or return_expected_q:
