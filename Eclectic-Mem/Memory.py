@@ -13,7 +13,7 @@ class Memory(Module):
         self.n = 0  # Current memory size
         self.memory = {}
         self.j = j
-        self._j = 0  # Counts updates
+        self._j = 0  # Counts time since last query
         self.retrieved = None
         self.key_size = key_size
         self.head_size = c_size
@@ -35,8 +35,11 @@ class Memory(Module):
             kwargs["t"] = torch.tensor([self.time] * batch_size).unsqueeze(dim=1)
         self.time += 0.001
         for key in kwargs:
-            assert kwargs[key].shape[0] == batch_size
-            memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]))
+            print(key, kwargs[key].shape)
+            assert kwargs[key].shape[0] == batch_size  # batches only
+            # get current memories for key
+            memory = getattr(self, key, __default=torch.empty([self.N] + list(kwargs[key].shape)[1:]))
+            # append new memories to them
             new_memory = torch.cat((kwargs[key].to(memory.device), memory[:-batch_size])).to('cuda:0')
             setattr(self, key, new_memory)
             self.memory[key] = self.__dict__[key]
@@ -56,7 +59,6 @@ class Memory(Module):
         '''
 
         k = min(k, self.n)
-        # Should we detach tau from the graph?
         deltas = delta(c, self.c[:self.n])  # B x n
         if detach_deltas:
             deltas = deltas.detach()

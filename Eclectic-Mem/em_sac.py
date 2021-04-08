@@ -465,7 +465,7 @@ class EclecticMemCurlSacAgent(object):
             # note: could also add c_prime and c_prime_next
             # mem = {"c": c, "c_next": c_next, "r": reward, "q": target_Q, "a": action, "d": not_done, "step": step}
             # TODO needs a sense of time within the episode (how far from the terminal state) since that affects q-value
-            mem = {"c": c,
+            mem = {"c": c.detach(),
                    # "c_next": c_next,
                    "r": reward, "q": target_Q.detach(), "a": action.detach(), "d": not_done}
             self.critic.memory.add(**mem)
