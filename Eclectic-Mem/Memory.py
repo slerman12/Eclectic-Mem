@@ -61,6 +61,7 @@ class Memory(Module):
         if weigh_q:
             tau = self.q[None, :self.n] * tau
         deltas, indices = torch.topk(tau, k=k, dim=1, sorted=False)
+        print(deltas.shape, indices.shape)
         # deltas.shape[0]
         # print(deltas.shape[0], c.shape[0], deltas.shape[1], self.c.shape[0], self.c.shape)
         assert deltas.shape[0] == c.shape[0] and deltas.shape[1] == k  # todo debugging check, can delete
@@ -69,6 +70,7 @@ class Memory(Module):
         for key in self.memory:
             if key != "c":
                 metadata = self.memory[key][indices]
+                print(key, metadata.shape)
                 if key == "d":
                     metadata = metadata.unsqueeze(dim=2)
                 result.append(metadata)  # B x k x mem_size
