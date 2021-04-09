@@ -19,8 +19,8 @@ from pathlib import Path
 def parse_args():
     parser = argparse.ArgumentParser()
     # environment
-    parser.add_argument('--domain_name', default='finger')
-    parser.add_argument('--task_name', default='spin')
+    parser.add_argument('--domain_name', default='quadruped')
+    parser.add_argument('--task_name', default='walk')
     parser.add_argument('--expname', default=None)
     parser.add_argument('--pre_transform_image_size', default=100, type=int)
 
@@ -64,7 +64,7 @@ def parse_args():
     parser.add_argument('--alpha_lr', default=1e-4, type=float)
     parser.add_argument('--alpha_beta', default=0.5, type=float)
     # misc
-    parser.add_argument('--seed', default=2, type=int)
+    parser.add_argument('--seed', default=-1, type=int)
     parser.add_argument('--work_dir', default='experiment_ours', type=str)
     parser.add_argument('--save_tb', default=False, action='store_true')
     parser.add_argument('--save_buffer', default=False, action='store_true')
@@ -235,7 +235,7 @@ def main():
         args=args,
         device=device
     )
-
+    # Trash line
     L = Logger(args.work_dir, use_tb=args.save_tb)
 
     episode, episode_reward, done = 0, 0, True

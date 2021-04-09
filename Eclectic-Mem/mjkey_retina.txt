@@ -1,0 +1,20 @@
+MuJoCo Pro Personal license activation key, number 76703, type 6.
+
+Issued to Jing Bi <jing.bi@rochester.edu>.
+
+Expires January 14, 2022.
+
+This file activates MuJoCo Pro on a single computer with id:
+LINUX_PPG9OSmN9D83a_R201SABsg353uX0F53HS0nS185
+
+Do not modify this file. Its entire content, including the
+plain text section, is used by the activation manager.
+
+b05eb03c2d5c2c761a75399c1ec0a0684fff975f7366ec17becf29fca19f328b
+62f66c053ed19ed4a2f7b2caf10445bd95c36f92317491b06dec24cbe88c8553
+89be1f9dec9e95289d24cd476307b5f922e1b963d2a87ed58e742261f33f411f
+f894b4d7fa2efaee2c65d390d2af10844e1ca5cc11c95fe3eb02ecadb9e1ce50
+3114a594ac345e106d112c707e5dd501d948e0f21b0cec0a547ba982a58e5de6
+feade90a273848d7f37b319f27ce47cf62219780d54be7acc6878dc1f0df55c7
+6e2ede3270bc72366bad848f707efa9b7eb79c2d4da7e45561cee24c460a62b9
+bcbc5d95a97082be72fb205d830372fd85be2cd756fd92ed696a4eb4d5878c97
