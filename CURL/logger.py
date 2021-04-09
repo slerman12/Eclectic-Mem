@@ -1,4 +1,4 @@
-# from torch.utils.tensorboard import SummaryWriter
+from torch.utils.tensorboard import SummaryWriter
 from collections import defaultdict
 import json
 import os
@@ -8,6 +8,7 @@ import torchvision
 import numpy as np
 from termcolor import colored
 from clearml import Logger as TrainLogger
+from pathlib import Path
 
 FORMAT_CONFIG = {
     'rl': {
@@ -42,7 +43,6 @@ class MetersGroup(object):
             os.remove(file_name)
         self._formating = formating
         self._meters = defaultdict(AverageMeter)
-        self.trains_logger = TrainLogger.current_logger()
 
     def log(self, key, value, n=1):
         self._meters[key].update(value, n)
@@ -59,7 +59,6 @@ class MetersGroup(object):
         return data
 
     def _dump_to_file(self, data):
-
         with open(self._file_name, 'w') as f:
             f.write(json.dumps(data) + '\n')
 
@@ -76,18 +75,12 @@ class MetersGroup(object):
         return template % (key, value)
 
     def _dump_to_console(self, data, prefix):
+        # prefix_text = 'Training' if prefix == 'train' else prefix
         prefix_text = prefix
         prefix = colored(prefix, 'yellow' if prefix == 'train' else 'green')
         pieces = ['{:5}'.format(prefix)]
-        changedict = {
-            'episode_reward': 'Reward'
-        }
         for key, disp_key, ty in self._formating:
             value = data.get(key, 0)
-            if key != 'episode' and key != 'step' and key != 'duration':
-                self.trains_logger.report_scalar('Training' if prefix_text == 'train' else prefix_text,
-                                                 changedict.get(key, key),
-                                                 iteration=data.get('step', 0), value=value)
             pieces.append(self._format(disp_key, value, ty))
         print('| %s' % (' | '.join(pieces)))
 
@@ -104,13 +97,13 @@ class MetersGroup(object):
 class Logger(object):
     def __init__(self, log_dir, use_tb=True, config='rl'):
         self._log_dir = log_dir
-        # if use_tb:
-        #     tb_dir = os.path.join(log_dir, 'tb')
-        #     if os.path.exists(tb_dir):
-        #         shutil.rmtree(tb_dir)
-        #     self._sw = SummaryWriter(tb_dir)
-        # else:
-        self._sw = None
+        if use_tb:
+            tb_dir = os.path.join(log_dir, 'tb')
+            if os.path.exists(tb_dir):
+                shutil.rmtree(tb_dir)
+            self._sw = SummaryWriter(tb_dir)
+        else:
+            self._sw = None
         self._train_mg = MetersGroup(
             os.path.join(log_dir, 'train.log'),
             formating=FORMAT_CONFIG[config]['train']
@@ -119,6 +112,7 @@ class Logger(object):
             os.path.join(log_dir, 'eval.log'),
             formating=FORMAT_CONFIG[config]['eval']
         )
+        self.trains_logger = TrainLogger.current_logger()
 
     def _try_sw_log(self, key, value, step):
         if self._sw is not None:
@@ -144,7 +138,16 @@ class Logger(object):
         assert key.startswith('train') or key.startswith('eval')
         if type(value) == torch.Tensor:
             value = value.item()
-        self._try_sw_log(key, value / n, step)
+        # self._try_sw_log(key, value / n, step)
+        prefix, linename = key.split('/')
+        prefix_text = 'Training' if prefix == 'train' else prefix
+        changedict = {
+            'episode_reward': 'Reward'
+        }
+        if linename not in ['episode', 'step', 'duration']:
+            self.trains_logger.report_scalar(prefix_text,
+                                             changedict.get(linename, linename),
+                                             iteration=step, value=value / n)
         mg = self._train_mg if key.startswith('train') else self._eval_mg
         mg.log(key, value, n)
 
