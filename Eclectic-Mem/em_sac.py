@@ -178,8 +178,8 @@ class Critic(nn.Module):
         # TODO try c into one, c_prime into other
         # note: this is just a test; without c, critic gradients don't propagate into the visual features
         # why does changing to c_prime cause error?
-        # q1 = self.Q1(c, action)
-        q1 = expected_q
+        q1 = self.Q1(c, action)
+        # q1 = expected_q
         q2 = self.Q2(c, action)
 
         self.outputs['q1'] = q1
