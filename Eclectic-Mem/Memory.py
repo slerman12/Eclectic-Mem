@@ -133,7 +133,7 @@ class Memory(Module):
         attended_memory = self._mhdpa(memory)
         # Add a skip connection to the multiheaded attention's input.
         memory = self.layer_norm_mem(memory + attended_memory)
-        print(self.n)  # TODO delete; just debugging check
+        # print(self.n)  # TODO delete; just debugging check
         # Add a skip connection to the attention_mlp's input.
         memory = self.layer_norm_mem(self.attention_mlp(memory) + memory)
         memory = torch.mean(memory, dim=1)
