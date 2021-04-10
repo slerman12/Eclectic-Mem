@@ -170,17 +170,16 @@ class Critic(nn.Module):
         # detach_encoder allows to stop gradient propogation to encoder
         c = self.encoder(obs, detach=detach_encoder)
 
-        # expected_q = self.memory(c, action=action,
-        #                          detach_deltas=True, return_expected_q=True)
+        expected_q = self.memory(c, action=action, detach_deltas=False, return_expected_q=True)
         # c_prime = self.memory(c)
-        c = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
+        # c = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
 
         # TODO try just differentiable similarity-weighted average of recalled memory values!
         # TODO try c into one, c_prime into other
         # note: this is just a test; without c, critic gradients don't propagate into the visual features
         # why does changing to c_prime cause error?
-        q1 = self.Q1(c, action)
-        # q1 = expected_q
+        # q1 = self.Q1(c, action)
+        q1 = expected_q
         q2 = self.Q2(c, action)
 
         self.outputs['q1'] = q1
@@ -324,7 +323,7 @@ class EclecticMemCurlSacAgent(object):
             log_interval=100,
             detach_encoder=False,
             curl_latent_dim=128,
-            em_N=5000,
+            em_N=100000,
             em_j=1,
             em_k=80,
             em_weigh_q=False,
