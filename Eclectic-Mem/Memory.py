@@ -155,7 +155,7 @@ class Memory(Module):
             self.project_mlp = torch.nn.Sequential(torch.nn.Linear(metadata.shape[-1], metadata.shape[-1]), torch.nn.ReLU(),
                                                    torch.nn.Linear(metadata.shape[-1], self.c_size)).to('cuda:0')
 
-    def forward(self, c, k, delta, weigh_q, action=None, encode_c=True, detach_deltas=True, return_expected_q=False):
+    def forward(self, c, k, delta, weigh_q, action=None, detach_deltas=True, return_expected_q=False):
         '''
         c should have batch dimension
         c: concept to query

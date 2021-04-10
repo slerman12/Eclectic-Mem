@@ -170,16 +170,17 @@ class Critic(nn.Module):
         # detach_encoder allows to stop gradient propogation to encoder
         c = self.encoder(obs, detach=detach_encoder)
 
-        expected_q = self.memory(c, action=action,
-                                 detach_deltas=True, return_expected_q=True)
+        # expected_q = self.memory(c, action=action,
+        #                          detach_deltas=True, return_expected_q=True)
         # c_prime = self.memory(c)
+        c = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
 
         # TODO try just differentiable similarity-weighted average of recalled memory values!
         # TODO try c into one, c_prime into other
         # note: this is just a test; without c, critic gradients don't propagate into the visual features
         # why does changing to c_prime cause error?
-        # q1 = self.Q1(c, action)
-        q1 = expected_q
+        q1 = self.Q1(c, action)
+        # q1 = expected_q
         q2 = self.Q2(c, action)
 
         self.outputs['q1'] = q1
@@ -223,7 +224,7 @@ class CURL(nn.Module):
         self.W = nn.Parameter(torch.rand(z_dim, z_dim))
         self.output_type = output_type
 
-    def encode(self, x, detach=False, ema=False):
+    def encode(self, x, detach=False, ema=False, action=None):
         """
         Encoder: z_t = e(x_t)
         :param x: x_t, x y coordinates
@@ -232,8 +233,14 @@ class CURL(nn.Module):
         if ema:
             with torch.no_grad():
                 z_out = self.encoder_target(x)
+                if action is not None:
+                    action_embed = self.action_encoder(action)
+                    z_out = torch.cat([z_out, action_embed], dim=-1)
         else:
             z_out = self.encoder(x)
+            if action is not None:
+                action_embed = self.action_encoder(action)
+                z_out = torch.cat([z_out, action_embed], dim=-1)
 
         if detach:
             z_out = z_out.detach()
@@ -278,7 +285,6 @@ class EclecticMem(Memory):
 
         if self.residual:
             c_prime = c_prime + c
-            assert False  # TODO can delete; for debugging
 
         if detach:
             c_prime = c_prime.detach()
