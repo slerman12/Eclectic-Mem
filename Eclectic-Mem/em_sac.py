@@ -173,7 +173,7 @@ class Critic(nn.Module):
         # expected_q = self.memory(c, action=action, detach_deltas=False, return_expected_q=True)
         # c_prime = self.memory(c)
         # c = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
-        c_prime = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
+        c_prime = self.memory(c, action=action, detach_deltas=True, return_expected_q=False)
 
         # TODO try just differentiable similarity-weighted average of recalled memory values!
         # TODO try c into one, c_prime into other
@@ -182,6 +182,7 @@ class Critic(nn.Module):
         # q1 = self.Q1(c, action)
         q1 = self.Q1(c_prime, action)
         q2 = self.Q2(c, action)
+        # TODO add q3 for a c_prime-partial-deltas variant
 
         self.outputs['q1'] = q1
         self.outputs['q2'] = q2
