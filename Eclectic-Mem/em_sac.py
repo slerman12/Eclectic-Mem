@@ -162,6 +162,9 @@ class Critic(nn.Module):
         self.Q2 = QFunction(
             self.encoder.feature_dim, action_shape[0], hidden_dim
         )
+        self.Q3 = QFunction(
+            self.encoder.feature_dim, action_shape[0], hidden_dim
+        )
 
         self.outputs = dict()
         self.apply(weight_init)
@@ -170,30 +173,26 @@ class Critic(nn.Module):
         # detach_encoder allows to stop gradient propogation to encoder
         c = self.encoder(obs, detach=detach_encoder)
 
-        # expected_q = self.memory(c, action=action, detach_deltas=False, return_expected_q=True)
+        expected_q = self.memory(c, action=action, detach_deltas=False, return_expected_q=True)
         # c_prime = self.memory(c)
         # c = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
         c_prime = self.memory(c, action=action, detach_deltas=True, return_expected_q=False)
 
-        # TODO try just differentiable similarity-weighted average of recalled memory values!
-        # TODO try c into one, c_prime into other
-        # note: this is just a test; without c, critic gradients don't propagate into the visual features
-        # why does changing to c_prime cause error?
-        # q1 = self.Q1(c, action)
-        q1 = self.Q1(c_prime, action)
-        q2 = self.Q2(c, action)
-        # TODO add q3 for a c_prime-partial-deltas variant
+        q1 = expected_q
+        q2 = self.Q2(c_prime, action)
+        q3 = self.Q3(c, action)
 
         self.outputs['q1'] = q1
         self.outputs['q2'] = q2
+        self.outputs['q3'] = q3
 
         if return_c:
             self.outputs['c'] = c
             # self.outputs['c_prime'] = c_prime
             # return q1, q2, c, c_prime
-            return q1, q2, c
+            return q1, q2, q3, c
 
-        return q1, q2
+        return q1, q2, q3
 
     def log(self, L, step, log_freq=LOG_FREQ):
         if step % log_freq != 0:
@@ -451,22 +450,27 @@ class EclecticMemCurlSacAgent(object):
             # TODO can compute similarity-weighted past q-values but otherwise output from c, no c_prime
             _, policy_action, log_pi, _ = self.actor(next_obs)
             # target_Q1, target_Q2, c_next, c_prime_next = self.critic_target(next_obs, policy_action, return_c=True)
-            target_Q1, target_Q2, c_next = self.critic_target(next_obs, policy_action, return_c=True)
+            target_Q1, target_Q2, target_Q3, c_next = self.critic_target(next_obs, policy_action, return_c=True)
             target_V = torch.min(target_Q1,
                                  target_Q2) - self.alpha.detach() * log_pi
             target_Q = reward + (not_done * self.discount * target_V)
 
         # get current Q estimates
         # current_Q1, current_Q2, c, c_prime = self.critic(obs, action, detach_encoder=self.detach_encoder, return_c=True)
-        current_Q1, current_Q2, c = self.critic(obs, action, detach_encoder=self.detach_encoder, return_c=True)
-        # TODO can add similarity-weighted past q-values mse_loss with q-target, but how does that benefit? Doesn't
-        # TODO can adapt faster than parametric critic, so maybe could substitute one of the Qs here
-        # TODO so substitute Q1, keep fully-parametric Q2; since don't want unseen states to be overestimated, take min
-        # TODO meanwhile, actor could be parametric; just remember to feed it as metadata in critic self-attention
-        critic_loss = F.mse_loss(current_Q1,
-                                 target_Q) + F.mse_loss(current_Q2, target_Q)
+        current_Q1, current_Q2, current_Q3, c = self.critic(obs, action, detach_encoder=self.detach_encoder, return_c=True)
+
+        critic_loss_Q1 = F.mse_loss(current_Q1, target_Q)
+        critic_loss_Q2 = F.mse_loss(current_Q2, target_Q)
+        critic_loss_Q3 = torch.zeros_like(critic_loss_Q1)
+        if current_Q3 is not None:
+            critic_loss_Q3 = F.mse_loss(current_Q3, target_Q)
+        critic_loss = critic_loss_Q1 + critic_loss_Q2 + critic_loss_Q3
+
         if step % self.log_interval == 0:
             L.log('train_critic/loss', critic_loss, step)
+            L.log('train_critic/loss_q1', critic_loss_Q1, step)
+            L.log('train_critic/loss_q2', critic_loss_Q2, step)
+            L.log('train_critic/loss_q3', critic_loss_Q3, step)
 
         # Update EclecticMem
         if self.critic.memory is not None:
