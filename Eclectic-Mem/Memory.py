@@ -41,18 +41,15 @@ class Memory(Module):
             assert len(kwargs[key].shape) >= 2  # include non-batch dim
             # get current memories for key or set default
             # TODO parameter memory
-            print(self.__dict__.keys())
-            memory = getattr(self, key, Parameter(torch.Tensor([self.N] + list(kwargs[key].shape)[1:])).to(self.device))
-            # memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]).to(self.device))
+            # memory = getattr(self, key, Parameter(torch.Tensor([self.N] + list(kwargs[key].shape)[1:])).to(self.device))
+            memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]).to(self.device))
             # append new memories to them
-            # new_memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size])).to(self.device)
+            new_memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size])).to(self.device)
             # TODO parameter memory
-            new_memory = Parameter(torch.cat((Parameter(kwargs[key]).to(self.device), memory[:-batch_size]))).to(self.device)
+            # new_memory = Parameter(torch.cat((Parameter(kwargs[key]).to(self.device), memory[:-batch_size]))).to(self.device)
             # with torch.no_grad():
             #     param.copy_(torch.randn(10, 10))
-            print(self.__dict__.keys())
             setattr(self, key, new_memory)
-            print(self.__dict__.keys())
             self.memory[key] = self.__dict__[key]
         assert self.c.shape[0] >= self.n  # todo debugging check, can delete
 
