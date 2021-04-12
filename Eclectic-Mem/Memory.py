@@ -46,7 +46,7 @@ class Memory(Module):
             # append new memories to them
             # new_memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size])).to(self.device)
             # TODO parameter memory
-            new_memory = Parameter(torch.cat((kwargs[key].to(self.device), memory[:-batch_size]))).to(self.device)
+            new_memory = Parameter(torch.cat((Parameter(kwargs[key]).to(self.device), memory[:-batch_size]))).to(self.device)
             # with torch.no_grad():
             #     param.copy_(torch.randn(10, 10))
             setattr(self, key, new_memory)
