@@ -176,11 +176,11 @@ class Critic(nn.Module):
         expected_q = self.memory(c, action=action, detach_deltas=False, return_expected_q=True)
         # c_prime = self.memory(c)
         # c = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
-        c_prime = self.memory(c, action=action, detach_deltas=True, return_expected_q=False)
+        # c_prime = self.memory(c, action=action, detach_deltas=True, return_expected_q=False)
 
-        q1 = expected_q
-        q2 = self.Q2(c_prime, action)
-        q3 = self.Q3(c, action)
+        q1 = self.Q1(c, action)
+        q2 = self.Q2(c, action)
+        q3 = expected_q
 
         self.outputs['q1'] = q1
         self.outputs['q2'] = q2
