@@ -156,14 +156,17 @@ class Critic(nn.Module):
 
         self.memory = memory
 
+        # c_shape = self.encoder.feature_dim
+        c_shape = self.encoder.feature_dim * 2
+
         self.Q1 = QFunction(
-            self.encoder.feature_dim, action_shape[0], hidden_dim
+            c_shape, action_shape[0], hidden_dim
         )
         self.Q2 = QFunction(
-            self.encoder.feature_dim, action_shape[0], hidden_dim
+            c_shape, action_shape[0], hidden_dim
         )
         self.Q3 = QFunction(
-            self.encoder.feature_dim, action_shape[0], hidden_dim
+            c_shape, action_shape[0], hidden_dim
         )
 
         self.outputs = dict()
@@ -177,11 +180,13 @@ class Critic(nn.Module):
         # c_prime = self.memory(c)
         # c = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
         c_prime = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
+        c = torch.cat([c, c_prime], dim=-1)
 
         q1 = self.Q1(c, action)
         q2 = self.Q2(c, action)
-        q3 = self.Q3(c_prime, action)
+        # q3 = self.Q3(c_prime, action)
         # q3 = expected_q
+        q3 = None
 
         self.outputs['q1'] = q1
         self.outputs['q2'] = q2
