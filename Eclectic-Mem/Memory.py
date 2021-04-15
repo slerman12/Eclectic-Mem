@@ -71,16 +71,12 @@ class Memory(Module):
             assert len(kwargs[key].shape) >= 2  # include non-batch dim
             # get current memories for key or set default
             # TODO parameter memory
-            test1 = getattr(self, "test1", Parameter(torch.empty([self.N] + list(kwargs[key].shape)[1:])).to(self.device))
-            test2 = getattr(self, "test2", torch.empty([self.N] + list(kwargs[key].shape)[1:]).to(self.device))
-            print(test1.shape, test2.shape)
-            print("test1" in list(self.__dict__.keys()), "test2" in list(self.__dict__.keys()))
-            # memory = getattr(self, key, Parameter(torch.Tensor([self.N] + list(kwargs[key].shape)[1:])).to(self.device))
-            memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]).to(self.device))
+            memory = getattr(self, key, Parameter(torch.Tensor([self.N] + list(kwargs[key].shape)[1:])).to(self.device))
+            # memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]).to(self.device))
             # append new memories to them
-            new_memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size])).to(self.device)
+            # new_memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size])).to(self.device)
             # TODO parameter memory
-            # new_memory = Parameter(torch.cat((Parameter(kwargs[key]).to(self.device), memory[:-batch_size]))).to(self.device)
+            new_memory = Parameter(torch.cat((kwargs[key].to(self.device), memory[:-batch_size]))).to(self.device)
             # with torch.no_grad():
             #     param.copy_(torch.randn(10, 10))
             setattr(self, key, new_memory)
