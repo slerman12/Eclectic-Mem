@@ -107,7 +107,7 @@ class Memory(Module):
 
         self._j = (self._j + 1) % self.j
 
-        return torch.cat(result, dim=2), expected_q
+        return torch.cat(result, dim=2).to(self.device), expected_q
 
     def _mhdpa(self, memory):
         """Perform multi-head attention from 'Attention is All You Need'.
