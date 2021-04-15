@@ -39,25 +39,20 @@ class Memory(Module):
             #                                                                        self.value_size)
             #                                                        ).to(self.device),
             "value_size": lambda metadata: metadata.shape[-1],
-            "qkv_size": lambda metadata: 2 * self.key_size + self.value_size,
-            "total_size": lambda metadata: self.qkv_size * self.num_heads,  # Denote as F.
-            "qkv_encoder": lambda metadata: torch.nn.Linear(self.value_size,
-                                                            self.total_size).to(self.device),
-            "layer_norm": lambda metadata: torch.nn.LayerNorm(self.total_size).to(self.device),
-            "layer_norm_mem": lambda metadata: torch.nn.LayerNorm(self.value_size).to(self.device),
-            "attention_mlp": lambda metadata: torch.nn.Sequential(torch.nn.Linear(self.value_size,
-                                                                                  self.value_size),
-                                                                  torch.nn.ReLU(),
-                                                                  torch.nn.Linear(self.value_size,
-                                                                                  self.value_size)
-                                                                  ).to(self.device),
+            "qkv_size": lambda x: 2 * self.key_size + self.value_size,
+            "total_size": lambda x: self.qkv_size * self.num_heads,  # Denote as F.
+            "qkv_encoder": lambda x: torch.nn.Linear(self.value_size, self.total_size).to(self.device),
+            "layer_norm": lambda x: torch.nn.LayerNorm(self.total_size).to(self.device),
+            "layer_norm_mem": lambda x: torch.nn.LayerNorm(self.value_size).to(self.device),
+            "attention_mlp": lambda x: torch.nn.Sequential(torch.nn.Linear(self.value_size, self.value_size),
+                                                           torch.nn.ReLU(), torch.nn.Linear(self.value_size,
+                                                                                            self.value_size)
+                                                           ).to(self.device),
             # TODO maybe superfluous
-            "project_output": lambda metadata: torch.nn.Sequential(torch.nn.Linear(self.value_size,
-                                                                                   self.value_size),
-                                                                   torch.nn.ReLU(),
-                                                                   torch.nn.Linear(self.value_size,
-                                                                                   self.c_prime_size)
-                                                                   ).to(self.device)}
+            "project_output": lambda x: torch.nn.Sequential(torch.nn.Linear(self.value_size, self.value_size),
+                                                            torch.nn.ReLU(), torch.nn.Linear(self.value_size,
+                                                                                             self.c_prime_size)
+                                                            ).to(self.device)}
 
     def add(self, **kwargs):
         '''
