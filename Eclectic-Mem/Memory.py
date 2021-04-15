@@ -29,9 +29,9 @@ class Memory(Module):
         self.metadata_encoder = {"value_size": lambda metadata: metadata.shape[-1],
                                  "qkv_size": lambda metadata: 2 * self.key_size + self.value_size,
                                  "total_size": lambda metadata: self.qkv_size * self.num_heads,  # Denote as F.
+                                 "qkv_encoder": lambda metadata: torch.nn.Linear(self.value_size, self.total_size),
                                  "layer_norm": lambda metadata: torch.nn.LayerNorm(self.total_size),
                                  "layer_norm_mem": lambda metadata: lambda: torch.nn.LayerNorm(self.value_size),
-                                 "qkv_encoder": lambda metadata: torch.nn.Linear(self.value_size, self.total_size),
                                  "attention_mlp": lambda metadata: torch.nn.Sequential(torch.nn.Linear(self.value_size,
                                                                                                        self.value_size),
                                                                                        torch.nn.ReLU(),
@@ -87,7 +87,7 @@ class Memory(Module):
         '''
 
         k = min(k, self.n)
-        deltas = delta(c.to(self.device), self.c[:self.n])  # B x n
+        deltas = delta(c, self.c[:self.n])  # B x n
         if detach_deltas:
             deltas = deltas.detach()
         deltas, indices = torch.topk(deltas, k=k, dim=1, sorted=False)  # B x k
@@ -121,7 +121,7 @@ class Memory(Module):
           new_memory: New memory tensor.
         """
         # qkv = [B, N, F]
-        qkv = self.qkv_encoder(memory)
+        qkv = self.qkv_encoder(memory.to(self.device))
         # should probably be per q, k, and v, but whatever
         qkv = self.layer_norm(qkv)
 
