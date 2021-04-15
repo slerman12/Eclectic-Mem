@@ -72,6 +72,7 @@ class Memory(Module):
             # get current memories for key or set default
             # TODO parameter memory
             memory = getattr(self, key, Parameter(torch.empty([self.N] + list(kwargs[key].shape)[1:])).to(self.device))
+            print(memory.shape)
             # memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]).to(self.device))
             # append new memories to them
             new_memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size])).to(self.device)
@@ -80,6 +81,7 @@ class Memory(Module):
             # with torch.no_grad():
             #     param.copy_(torch.randn(10, 10))
             setattr(self, key, new_memory)
+            print(key in self.__dict__)
             self.memory[key] = self.__dict__[key]
         assert self.c.shape[0] >= self.n  # todo debugging check, can delete
 
