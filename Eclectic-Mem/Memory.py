@@ -12,16 +12,20 @@ class Memory(Module):
         super().__init__()
         self.N = N
         self.n = 0  # Current memory size
+
         self.memory = {}
+
         self.j = j
         self._j = 0  # Counts time since last query
         self.retrieved = None
+
         self.key_size = key_size
         self.head_size = c_size
         self.c_size = c_size
-        self.qkv_encoder = None
         self.num_heads = num_heads
+
         self.time = 0.001
+
         self.device = 'cuda:0'
 
         # This is for dynamic sized value_size in case metadata includes current action
@@ -187,10 +191,10 @@ class Memory(Module):
     #         self.project_mlp = torch.nn.Sequential(torch.nn.Linear(metadata.shape[-1], metadata.shape[-1]), torch.nn.ReLU(),
     #                                                torch.nn.Linear(metadata.shape[-1], self.c_size)).to('cuda:0')
 
-    def set_metadata_encoder(self, metadata, action=None):
-        prefix = "action_" if action is None else "q_value_"
+    def set_metadata_encoder(self, metadata, action=None, id=""):
+        id += "action_" if action is None else "q_value_"
         for module in self.metadata_encoder:
-            encoder_module = getattr(self, prefix + module, self.metadata_encoder[module](metadata))
+            encoder_module = getattr(self, id + module, self.metadata_encoder[module](metadata))
             setattr(self, module, encoder_module)
 
     def forward(self, c, k, delta, weigh_q, action=None, detach_deltas=True, return_expected_q=False):
