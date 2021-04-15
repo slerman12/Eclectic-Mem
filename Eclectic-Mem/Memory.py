@@ -44,7 +44,8 @@ class Memory(Module):
                                                                                                         self.value_size),
                                                                                         torch.nn.ReLU(),
                                                                                         torch.nn.Linear(self.value_size,
-                                                                                                        self.c_size))}
+                                                                                                        self.c_size)
+                                                                                        ).to(self.device)}
 
     def add(self, **kwargs):
         '''
