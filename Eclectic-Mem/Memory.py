@@ -185,7 +185,7 @@ class Memory(Module):
     #                                                torch.nn.Linear(metadata.shape[-1], self.c_size)).to('cuda:0')
 
     def set_metadata_encoder(self, metadata, action=None):
-        prefix = "q_value_" if action else "action_"
+        prefix = "action_" if action is None else "q_value_"
         for module in self.metadata_encoder:
             encoder_module = getattr(self, prefix + module, self.metadata_encoder[module](metadata))
             setattr(self, module, encoder_module)
