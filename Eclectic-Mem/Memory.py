@@ -31,26 +31,33 @@ class Memory(Module):
 
         # This is for dynamic sized value_size in case metadata includes current action
         # TODO just use predefined value size and project metadata to that size; maybe even reuse for q-value & action
-        self.metadata_encoder = {"value_size": lambda metadata: metadata.shape[-1],
-                                 "qkv_size": lambda metadata: 2 * self.key_size + self.value_size,
-                                 "total_size": lambda metadata: self.qkv_size * self.num_heads,  # Denote as F.
-                                 "qkv_encoder": lambda metadata: torch.nn.Linear(self.value_size,
-                                                                                 self.total_size).to(self.device),
-                                 "layer_norm": lambda metadata: torch.nn.LayerNorm(self.total_size).to(self.device),
-                                 "layer_norm_mem": lambda metadata: torch.nn.LayerNorm(self.value_size).to(self.device),
-                                 "attention_mlp": lambda metadata: torch.nn.Sequential(torch.nn.Linear(self.value_size,
-                                                                                                       self.value_size),
-                                                                                       torch.nn.ReLU(),
-                                                                                       torch.nn.Linear(self.value_size,
-                                                                                                       self.value_size)
-                                                                                       ).to(self.device),
-                                 # TODO maybe superfluous
-                                 "project_output": lambda metadata: torch.nn.Sequential(torch.nn.Linear(self.value_size,
-                                                                                                        self.value_size),
-                                                                                        torch.nn.ReLU(),
-                                                                                        torch.nn.Linear(self.value_size,
-                                                                                                        self.c_prime_size)
-                                                                                        ).to(self.device)}
+        self.metadata_encoder = {
+            # "embed_metadata": lambda metadata: torch.nn.Sequential(torch.nn.Linear(metadata.shape[-1],
+            #                                                                        self.value_size),
+            #                                                        torch.nn.ReLU(),
+            #                                                        torch.nn.Linear(self.value_size,
+            #                                                                        self.value_size)
+            #                                                        ).to(self.device),
+            "value_size": lambda metadata: metadata.shape[-1],
+            "qkv_size": lambda metadata: 2 * self.key_size + self.value_size,
+            "total_size": lambda metadata: self.qkv_size * self.num_heads,  # Denote as F.
+            "qkv_encoder": lambda metadata: torch.nn.Linear(self.value_size,
+                                                            self.total_size).to(self.device),
+            "layer_norm": lambda metadata: torch.nn.LayerNorm(self.total_size).to(self.device),
+            "layer_norm_mem": lambda metadata: torch.nn.LayerNorm(self.value_size).to(self.device),
+            "attention_mlp": lambda metadata: torch.nn.Sequential(torch.nn.Linear(self.value_size,
+                                                                                  self.value_size),
+                                                                  torch.nn.ReLU(),
+                                                                  torch.nn.Linear(self.value_size,
+                                                                                  self.value_size)
+                                                                  ).to(self.device),
+            # TODO maybe superfluous
+            "project_output": lambda metadata: torch.nn.Sequential(torch.nn.Linear(self.value_size,
+                                                                                   self.value_size),
+                                                                   torch.nn.ReLU(),
+                                                                   torch.nn.Linear(self.value_size,
+                                                                                   self.c_prime_size)
+                                                                   ).to(self.device)}
 
     def add(self, **kwargs):
         '''
@@ -155,28 +162,28 @@ class Memory(Module):
         new_memory = torch.nn.Flatten(start_dim=2)(output_transpose)
         return new_memory
 
-    def _attend_over_memory(self, memory, project_input=False, project_output=False):
+    def _attend_over_metadata(self, metadata, embed_metadata=False, project_output=False):
         """Perform multiheaded attention over `memory`.
         As implemented in:
         https://github.com/deepmind/sonnet/blob/master/sonnet/python/modules/relational_memory.py
         Args:
-          memory: Current relational memory.
+          metadata: Current relational memory.
         Returns:
           The attended-over memory.
         """
         # TODO project input to a predefined value_size instead of using metadata directly
-        if project_input:
-            memory = self.project_metadata(memory)
-        attended_memory = self._mhdpa(memory)
+        if embed_metadata:
+            metadata = self.embed_metadata(metadata)
+        attended_memory = self._mhdpa(metadata)
         # Add a skip connection to the multiheaded attention's input.
-        memory = self.layer_norm_mem(memory + attended_memory)
+        metadata = self.layer_norm_mem(metadata + attended_memory)
         # print(self.n)  # TODO delete; just debugging check
         # Add a skip connection to the attention_mlp's input.
-        memory = self.layer_norm_mem(self.attention_mlp(memory) + memory)
-        memory = torch.mean(memory, dim=1)
+        metadata = self.layer_norm_mem(self.attention_mlp(metadata) + metadata)
+        metadata = torch.mean(metadata, dim=1)
         if project_output:
-            memory = self.project_output(memory)
-        return memory
+            metadata = self.project_output(metadata)
+        return metadata
 
     def set_metadata_encoder(self, metadata, action=None, id=""):
         id += "action_" if action is None else "q_value_"
@@ -205,6 +212,7 @@ class Memory(Module):
             metadata = self.retrieved
 
         self.set_metadata_encoder(metadata, action=action)
-        c_prime = self._attend_over_memory(metadata, project_output=True)
+        # TODO embed metadata
+        c_prime = self._attend_over_metadata(metadata, embed_metadata=False, project_output=True)
 
         return c_prime
