@@ -20,8 +20,9 @@ class Memory(Module):
         self.retrieved = None
 
         self.key_size = key_size
+        # TODO can set c_size automatically in self.add()
         self.head_size = c_size
-        self.c_size = c_size
+        self.c_prime_size = c_size
         self.num_heads = num_heads
 
         self.time = 0.001
@@ -48,7 +49,7 @@ class Memory(Module):
                                                                                                         self.value_size),
                                                                                         torch.nn.ReLU(),
                                                                                         torch.nn.Linear(self.value_size,
-                                                                                                        self.c_size)
+                                                                                                        self.c_prime_size)
                                                                                         ).to(self.device)}
 
     def add(self, **kwargs):
@@ -177,20 +178,6 @@ class Memory(Module):
             memory = self.project_output(memory)
         return memory
 
-    # def set_metadata_encoder(self, metadata, action=None):
-    #     if not self.qkv_encoder:
-    #         self.value_size = metadata.shape[-1]
-    #         self.qkv_size = 2 * self.key_size + self.value_size  # 32*2+107 = 171
-    #         self.total_size = self.qkv_size * self.num_heads  # Denote as F.
-    #         self.layer_norm = torch.nn.LayerNorm(self.total_size).to('cuda:0')
-    #         self.layer_norm_mem = torch.nn.LayerNorm(metadata.shape[-1]).to('cuda:0')
-    #         self.qkv_encoder = torch.nn.Linear(metadata.shape[-1], self.total_size).to('cuda:0')
-    #         self.attention_mlp = torch.nn.Sequential(torch.nn.Linear(metadata.shape[-1], metadata.shape[-1]),
-    #                                                  torch.nn.ReLU(),
-    #                                                  torch.nn.Linear(metadata.shape[-1], metadata.shape[-1])).to('cuda:0')
-    #         self.project_mlp = torch.nn.Sequential(torch.nn.Linear(metadata.shape[-1], metadata.shape[-1]), torch.nn.ReLU(),
-    #                                                torch.nn.Linear(metadata.shape[-1], self.c_size)).to('cuda:0')
-
     def set_metadata_encoder(self, metadata, action=None, id=""):
         id += "action_" if action is None else "q_value_"
         for module in self.metadata_encoder:
@@ -205,17 +192,19 @@ class Memory(Module):
         delta: CL embed function
         '''
         if self.n == 0:
-            if return_expected_q:
-                return torch.zeros(c.shape[0], 1).to(self.device)
-            else:
-                return c
+            return torch.zeros(c.shape[0], 1).to(self.device) if return_expected_q else c
         if self._j == 0 or c.shape[0] == 1 or return_expected_q:
+            # TODO can get rid of weigh_q; just need to update em_sac.py calls to be without it
             metadata, expected_q = self._query(c, k, delta, weigh_q or return_expected_q, action=action)
             if return_expected_q:
                 return expected_q
-            self.set_metadata_encoder(metadata, action=action)
-            c_prime = self._attend_over_memory(metadata, project_output=True)
-            self.retrieved = c_prime
+
+            # TODO can save and reuse retrieved
+            # self.retrieved = metadata
         else:
-            c_prime = self.retrieved
+            metadata = self.retrieved
+
+        self.set_metadata_encoder(metadata, action=action)
+        c_prime = self._attend_over_memory(metadata, project_output=True)
+
         return c_prime
