@@ -87,7 +87,7 @@ class Memory(Module):
         '''
 
         k = min(k, self.n)
-        deltas = delta(c, self.c[:self.n])  # B x n
+        deltas = delta(c.to(self.device), self.c[:self.n])  # B x n
         if detach_deltas:
             deltas = deltas.detach()
         deltas, indices = torch.topk(deltas, k=k, dim=1, sorted=False)  # B x k
@@ -107,7 +107,7 @@ class Memory(Module):
 
         self._j = (self._j + 1) % self.j
 
-        return torch.cat(result, dim=2).to(self.device), expected_q
+        return torch.cat(result, dim=2), expected_q
 
     def _mhdpa(self, memory):
         """Perform multi-head attention from 'Attention is All You Need'.
