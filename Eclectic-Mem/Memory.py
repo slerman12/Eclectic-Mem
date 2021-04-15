@@ -74,9 +74,9 @@ class Memory(Module):
             memory = getattr(self, key, Parameter(torch.empty([self.N] + list(kwargs[key].shape)[1:])).to(self.device))
             # memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]).to(self.device))
             # append new memories to them
-            # new_memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size])).to(self.device)
+            new_memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size])).to(self.device)
             # TODO parameter memory
-            new_memory = Parameter(torch.cat((kwargs[key].to(self.device), memory[:-batch_size]))).to(self.device)
+            # new_memory = Parameter(torch.cat((kwargs[key].to(self.device), memory[:-batch_size]))).to(self.device)
             print(new_memory.shape)
             # with torch.no_grad():
             #     param.copy_(torch.randn(10, 10))
