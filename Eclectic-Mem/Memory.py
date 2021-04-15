@@ -24,6 +24,26 @@ class Memory(Module):
         self.time = 0.001
         self.device = 'cuda:0'
 
+        # This is for dynamic sized value_size in case metadata includes current action
+        # TODO just use predefined value size and project metadata to that size; maybe even reuse for q-value & action
+        self.metadata_encoder = {"value_size": lambda metadata: metadata.shape[-1],
+                                 "qkv_size": lambda metadata: 2 * self.key_size + self.value_size,
+                                 "total_size": lambda metadata: self.qkv_size * self.num_heads,  # Denote as F.
+                                 "layer_norm": lambda metadata: torch.nn.LayerNorm(self.total_size),
+                                 "layer_norm_mem": lambda metadata: lambda: torch.nn.LayerNorm(self.value_size),
+                                 "qkv_encoder": lambda metadata: torch.nn.Linear(self.value_size, self.total_size),
+                                 "attention_mlp": lambda metadata: torch.nn.Sequential(torch.nn.Linear(self.value_size,
+                                                                                                       self.value_size),
+                                                                                       torch.nn.ReLU(),
+                                                                                       torch.nn.Linear(self.value_size,
+                                                                                                       self.value_size)),
+                                 # TODO maybe superfluous
+                                 "project_output": lambda metadata: torch.nn.Sequential(torch.nn.Linear(self.value_size,
+                                                                                                        self.value_size),
+                                                                                        torch.nn.ReLU(),
+                                                                                        torch.nn.Linear(self.value_size,
+                                                                                                        self.c_size))}
+
     def add(self, **kwargs):
         '''
         Memory content (kwargs values) should be tensors with batch dimension
@@ -127,7 +147,7 @@ class Memory(Module):
         new_memory = torch.nn.Flatten(start_dim=2)(output_transpose)
         return new_memory
 
-    def _attend_over_memory(self, memory, project_mlp=False):
+    def _attend_over_memory(self, memory, project_input=False, project_output=False):
         """Perform multiheaded attention over `memory`.
         As implemented in:
         https://github.com/deepmind/sonnet/blob/master/sonnet/python/modules/relational_memory.py
@@ -136,7 +156,9 @@ class Memory(Module):
         Returns:
           The attended-over memory.
         """
-
+        # TODO project input to a predefined value_size instead of using metadata directly
+        if project_input:
+            memory = self.project_metadata(memory)
         attended_memory = self._mhdpa(memory)
         # Add a skip connection to the multiheaded attention's input.
         memory = self.layer_norm_mem(memory + attended_memory)
@@ -144,23 +166,29 @@ class Memory(Module):
         # Add a skip connection to the attention_mlp's input.
         memory = self.layer_norm_mem(self.attention_mlp(memory) + memory)
         memory = torch.mean(memory, dim=1)
-        if project_mlp:
-            memory = self.project_mlp(memory)
+        if project_output:
+            memory = self.project_output(memory)
         return memory
 
-    def set_qkv_encoder(self, metadata):
-        if not self.qkv_encoder:
-            self.value_size = metadata.shape[-1]
-            self.qkv_size = 2 * self.key_size + self.value_size  # 32*2+107 = 171
-            self.total_size = self.qkv_size * self.num_heads  # Denote as F.
-            self.layer_norm = torch.nn.LayerNorm(self.total_size).to('cuda:0')
-            self.layer_norm_mem = torch.nn.LayerNorm(metadata.shape[-1]).to('cuda:0')
-            self.qkv_encoder = torch.nn.Linear(metadata.shape[-1], self.total_size).to('cuda:0')
-            self.attention_mlp = torch.nn.Sequential(torch.nn.Linear(metadata.shape[-1], metadata.shape[-1]),
-                                                     torch.nn.ReLU(),
-                                                     torch.nn.Linear(metadata.shape[-1], metadata.shape[-1])).to('cuda:0')
-            self.project_mlp = torch.nn.Sequential(torch.nn.Linear(metadata.shape[-1], metadata.shape[-1]), torch.nn.ReLU(),
-                                                   torch.nn.Linear(metadata.shape[-1], self.c_size)).to('cuda:0')
+    # def set_metadata_encoder(self, metadata, action=None):
+    #     if not self.qkv_encoder:
+    #         self.value_size = metadata.shape[-1]
+    #         self.qkv_size = 2 * self.key_size + self.value_size  # 32*2+107 = 171
+    #         self.total_size = self.qkv_size * self.num_heads  # Denote as F.
+    #         self.layer_norm = torch.nn.LayerNorm(self.total_size).to('cuda:0')
+    #         self.layer_norm_mem = torch.nn.LayerNorm(metadata.shape[-1]).to('cuda:0')
+    #         self.qkv_encoder = torch.nn.Linear(metadata.shape[-1], self.total_size).to('cuda:0')
+    #         self.attention_mlp = torch.nn.Sequential(torch.nn.Linear(metadata.shape[-1], metadata.shape[-1]),
+    #                                                  torch.nn.ReLU(),
+    #                                                  torch.nn.Linear(metadata.shape[-1], metadata.shape[-1])).to('cuda:0')
+    #         self.project_mlp = torch.nn.Sequential(torch.nn.Linear(metadata.shape[-1], metadata.shape[-1]), torch.nn.ReLU(),
+    #                                                torch.nn.Linear(metadata.shape[-1], self.c_size)).to('cuda:0')
+
+    def set_metadata_encoder(self, metadata, action=None):
+        prefix = "q_value_" if action else "action_"
+        for module in self.metadata_encoder:
+            encoder_module = getattr(self, prefix + module, self.metadata_encoder[module](metadata))
+            setattr(self, module, encoder_module)
 
     def forward(self, c, k, delta, weigh_q, action=None, detach_deltas=True, return_expected_q=False):
         '''
@@ -178,8 +206,8 @@ class Memory(Module):
             metadata, expected_q = self._query(c, k, delta, weigh_q or return_expected_q, action=action)
             if return_expected_q:
                 return expected_q
-            self.set_qkv_encoder(metadata)
-            c_prime = self._attend_over_memory(metadata, project_mlp=True)
+            self.set_metadata_encoder(metadata, action=action)
+            c_prime = self._attend_over_memory(metadata, project_output=True)
             self.retrieved = c_prime
         else:
             c_prime = self.retrieved
