@@ -29,9 +29,10 @@ class Memory(Module):
         self.metadata_encoder = {"value_size": lambda metadata: metadata.shape[-1],
                                  "qkv_size": lambda metadata: 2 * self.key_size + self.value_size,
                                  "total_size": lambda metadata: self.qkv_size * self.num_heads,  # Denote as F.
-                                 "qkv_encoder": lambda metadata: torch.nn.Linear(self.value_size, self.total_size).to(self.device),
+                                 "qkv_encoder": lambda metadata: torch.nn.Linear(self.value_size,
+                                                                                 self.total_size).to(self.device),
                                  "layer_norm": lambda metadata: torch.nn.LayerNorm(self.total_size),
-                                 "layer_norm_mem": lambda metadata: torch.nn.LayerNorm(self.value_size),
+                                 "layer_norm_mem": lambda metadata: torch.nn.LayerNorm(self.value_size).to(self.device),
                                  "attention_mlp": lambda metadata: torch.nn.Sequential(torch.nn.Linear(self.value_size,
                                                                                                        self.value_size),
                                                                                        torch.nn.ReLU(),
