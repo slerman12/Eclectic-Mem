@@ -66,7 +66,8 @@ class Actor(nn.Module):
         self.log_std_max = log_std_max
 
         self.trunk = nn.Sequential(
-            nn.Linear(self.encoder.feature_dim, hidden_dim), nn.ReLU(),
+            # nn.Linear(self.encoder.feature_dim, hidden_dim), nn.ReLU(),
+            nn.Linear(self.encoder.feature_dim * 2, hidden_dim), nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim), nn.ReLU(),
             nn.Linear(hidden_dim, 2 * action_shape[0])
         )
@@ -79,9 +80,10 @@ class Actor(nn.Module):
     ):
         c = self.encoder(obs, detach=detach_encoder)
 
-        # c = self.memory(c, detach=detach_encoder)
+        c_prime = self.memory(c, detach_deltas=False, return_expected_q=False)
+        c_prime = torch.cat([c, c_prime], dim=-1)
 
-        mu, log_std = self.trunk(c).chunk(2, dim=-1)
+        mu, log_std = self.trunk(c_prime).chunk(2, dim=-1)
 
         # constrain log_std inside [log_std_min, log_std_max]
         log_std = torch.tanh(log_std)
