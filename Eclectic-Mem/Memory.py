@@ -84,6 +84,8 @@ class Memory(Module):
             # with torch.no_grad():
             #     param.copy_(torch.randn(10, 10))
             setattr(self, key, memory.to(self.device))
+            if key == "a":
+                print(memory.shape, kwargs["a"].shape, self.a.shape)
             # print(key in self.__dict__)
             self.memory[key] = self.__dict__[key]
         assert self.c.shape[0] >= self.n  # todo debugging check, can delete
