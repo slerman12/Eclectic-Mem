@@ -481,7 +481,12 @@ class EclecticMemCurlSacAgent(object):
             L.log('train_critic/loss_q2', critic_loss_Q2, step)
             L.log('train_critic/loss_q3', critic_loss_Q3, step)
 
-        # Update EclecticMem
+        # Optimize the critic
+        self.critic_optimizer.zero_grad()
+        critic_loss.backward()
+        self.critic_optimizer.step()
+
+        # Update Eclectic-Mem
         if self.critic.memory is not None:
             # note: could also add c_prime and c_prime_next
             # mem = {"c": c, "c_next": c_next, "r": reward, "q": target_Q, "a": action, "d": not_done, "step": step}
@@ -490,11 +495,6 @@ class EclecticMemCurlSacAgent(object):
                    # "c_next": c_next,
                    "r": reward, "q": target_Q.detach(), "a": action.detach(), "d": not_done}
             self.critic.memory.add(**mem)
-
-        # Optimize the critic
-        self.critic_optimizer.zero_grad()
-        critic_loss.backward()
-        self.critic_optimizer.step()
 
         self.critic.log(L, step)
 
