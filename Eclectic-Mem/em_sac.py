@@ -159,8 +159,8 @@ class Critic(nn.Module):
 
         self.memory = memory
 
-        c_shape = self.encoder.feature_dim
-        # c_shape = self.encoder.feature_dim * 2
+        # c_shape = self.encoder.feature_dim
+        c_shape = self.encoder.feature_dim * 2
 
         self.Q1 = QFunction(
             c_shape, action_shape[0], hidden_dim
