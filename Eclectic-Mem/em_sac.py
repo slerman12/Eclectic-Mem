@@ -269,7 +269,6 @@ class CURL(nn.Module):
         # logits = torch.matmul(z_a, Wz)  # (B,B)
         # euclidean distance like NEC
         logits = torch.cdist(z_a, z_pos, p=2)
-        print(logits.shape)
         logits = logits - torch.max(logits, 1)[0][:, None]
         return logits
 
