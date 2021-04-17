@@ -265,10 +265,10 @@ class CURL(nn.Module):
         - to compute loss use multiclass cross entropy with identity matrix for labels
         """
         # TODO add action encodings to the CL (store encodings in memory instead of actions)
-        # Wz = torch.matmul(self.W, z_pos.T)  # (z_dim,B)
-        # logits = torch.matmul(z_a, Wz)  # (B,B)
+        Wz = torch.matmul(self.W, z_pos.T)  # (z_dim,B)
+        logits = torch.matmul(z_a, Wz)  # (B,B)
         # euclidean distance like NEC
-        logits = torch.cdist(z_a, z_pos, p=2)
+        # logits = torch.cdist(z_a, z_pos, p=2)
         logits = logits - torch.max(logits, 1)[0][:, None]
         return logits
 
@@ -281,7 +281,7 @@ class EclecticMem(Memory):
         self.k = k
         self.weigh_q = weigh_q
 
-    def forward(self, c, detach=False, action=None, detach_deltas=True, return_expected_q=False):
+    def forward(self, c, detach=False, action=None, detach_deltas=False, return_expected_q=False):
         '''
         :param c: concept to encode
         :param detach: whether to detach from comp graph
@@ -488,6 +488,7 @@ class EclecticMemCurlSacAgent(object):
         self.critic_optimizer.step()
 
         # Update Eclectic-Mem
+        # TODO what if these experiences are sampled randomly from past and are reused or aren't added chronologically??
         if self.critic.memory is not None:
             # note: could also add c_prime and c_prime_next
             # mem = {"c": c, "c_next": c_next, "r": reward, "q": target_Q, "a": action, "d": not_done, "step": step}

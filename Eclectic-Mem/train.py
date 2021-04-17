@@ -290,6 +290,7 @@ def main():
             done
         )
         episode_reward += reward
+        # TODO should also store c and use as memory
         replay_buffer.add(obs, action, reward, next_obs, done_bool)
 
         obs = next_obs

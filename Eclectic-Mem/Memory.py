@@ -86,7 +86,7 @@ class Memory(Module):
         if self.n < self.N:
             self.n = min(self.N, self.n + batch_size)
 
-    def _query(self, c, k, delta, weigh_q=False, detach_deltas=True, action=None):
+    def _query(self, c, k, delta, weigh_q=False, detach_deltas=False, action=None):
         '''
         c should have batch dimension
         c: concept to query
@@ -185,7 +185,7 @@ class Memory(Module):
             encoder_module = getattr(self, id + module, self.metadata_encoder[module](metadata))
             setattr(self, module, encoder_module)
 
-    def forward(self, c, k, delta, weigh_q, action=None, detach_deltas=True, return_expected_q=False):
+    def forward(self, c, k, delta, weigh_q, action=None, detach_deltas=False, return_expected_q=False):
         '''
         c should have batch dimension
         c: concept to query
@@ -196,7 +196,8 @@ class Memory(Module):
             return torch.zeros(c.shape[0], 1).to(self.device) if return_expected_q else c
         if self._j == 0 or c.shape[0] == 1 or return_expected_q:
             # TODO can get rid of weigh_q; just need to update em_sac.py calls to be without it
-            metadata, expected_q = self._query(c, k, delta, weigh_q or return_expected_q, action=action)
+            metadata, expected_q = self._query(c, k, delta, weigh_q or return_expected_q, action=action,
+                                               detach_deltas=detach_deltas)
             if return_expected_q:
                 return expected_q
 
