@@ -30,7 +30,7 @@ class Memory(Module):
 
         self.device = 'cuda:0'
 
-        # This is for dynamic sized value_size in case metadata includes current action
+        # This is for dynamic sized value_size in case metadata includes or doesn't include current action
         # TODO just use predefined value size and project metadata to that size; maybe even reuse for q-value & action
         self.metadata_encoder = {
             # "embed_metadata": lambda metadata: torch.nn.Sequential(torch.nn.Linear(metadata.shape[-1],
@@ -70,16 +70,14 @@ class Memory(Module):
         for key in kwargs:
             assert kwargs[key].shape[0] == batch_size  # batches only
             assert len(kwargs[key].shape) >= 2  # include non-batch dim
-            # get current memories for key or set default
-            # TODO parameter memory
-            memory = getattr(self, key, Parameter(torch.empty([self.N] + list(kwargs[key].shape)[1:])).to(self.device))
-            # memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]).to(self.device))
 
-            # append new memories to them
-            # memory[batch_size:] = memory[:-batch_size].clone()
-            # memory[:batch_size] = kwargs[key]
-            memory = torch.cat((Parameter(kwargs[key]).to(self.device), memory[:-batch_size]))
-            # memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size]))
+            # get current memories for key or set default
+            # memory = getattr(self, key, Parameter(torch.empty([self.N] + list(kwargs[key].shape)[1:])).to(self.device))
+            memory = getattr(self, key, torch.empty([self.N] + list(kwargs[key].shape)[1:]).to(self.device))
+
+            # add batch to memory
+            # memory = torch.cat((Parameter(kwargs[key]).to(self.device), memory[:-batch_size]))
+            memory = torch.cat((kwargs[key].to(self.device), memory[:-batch_size]))
             setattr(self, key, memory)
             self.memory[key] = self.__dict__[key]
         assert self.c.shape[0] >= self.n  # todo debugging check, can delete
