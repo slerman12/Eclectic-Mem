@@ -182,7 +182,7 @@ class Critic(nn.Module):
         # expected_q = self.memory(c, action=action, detach_deltas=False, return_expected_q=True)
         # c_prime = self.memory(c)
         # c = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
-        c_prime = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
+        c_prime = self.memory(c, action=action, detach_deltas=Trueq1, return_expected_q=False)
         c_prime = torch.cat([c, c_prime], dim=-1)
 
         q1 = self.Q1(c_prime, action)

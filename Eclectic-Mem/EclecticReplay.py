@@ -202,6 +202,8 @@ class EclecticMem(Dataset):
 
         n = self.capacity if self.full else self.idx
 
+        # TODO set top K to parameters to enable updates, and then retroactively update the stored data
+        # TODO however, keep in mind that this can potentially corrupt/modify the original replay actions
         k = min(k, n)
         deltas = delta(c, self.c[:n])  # B x n
         if detach_deltas:
@@ -312,6 +314,7 @@ class EclecticMem(Dataset):
             return expected_q
 
         # TODO can save and reuse retrieved
+        # TODO for one, don't have to query memory redundantly for both actor and critic
         # self.retrieved = metadata
 
         self.set_metadata_encoder(metadata, action=action)
