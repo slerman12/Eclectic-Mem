@@ -183,7 +183,7 @@ class Critic(nn.Module):
         # c_prime = self.memory(c)
         # c = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
         c_prime = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
-        # c_prime = torch.cat([c, c_prime], dim=-1)
+        c_prime = torch.cat([c, c_prime], dim=-1)
 
         q1 = self.Q1(c_prime, action)
         q2 = self.Q2(c_prime, action)
@@ -264,10 +264,11 @@ class CURL(nn.Module):
         - negatives are all other elements
         - to compute loss use multiclass cross entropy with identity matrix for labels
         """
-        # TODO euclidean distance like NEC
         # TODO add action encodings to the CL (store encodings in memory instead of actions)
-        Wz = torch.matmul(self.W, z_pos.T)  # (z_dim,B)
-        logits = torch.matmul(z_a, Wz)  # (B,B)
+        # Wz = torch.matmul(self.W, z_pos.T)  # (z_dim,B)
+        # logits = torch.matmul(z_a, Wz)  # (B,B)
+        # euclidean distance like NEC
+        logits = torch.cdist(z_a, z_pos, p=2)
         logits = logits - torch.max(logits, 1)[0][:, None]
         return logits
 
