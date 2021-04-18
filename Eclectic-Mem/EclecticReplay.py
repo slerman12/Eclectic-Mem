@@ -210,6 +210,7 @@ class EclecticMem(Dataset, Module):
         # TODO set top K to parameters to enable updates, and then retroactively update the stored data
         # TODO however, keep in mind that this can potentially corrupt/modify the original replay actions
         k = min(self.k, n)
+        # TODO maybe the computation should just happen on CPU since copying memory to GPU might be very expensive
         past_c = torch.as_tensor(self.c[start:end], device=self.device).float()
         deltas = self.delta(c, past_c)  # B x n
         if detach_deltas:
@@ -225,7 +226,7 @@ class EclecticMem(Dataset, Module):
         result = [deltas.unsqueeze(dim=2)]
         for key in ["actions", "rewards", "not_dones", "times", "q"]:
             metadata = getattr(self, key)[start: end][indices]  # B x k x mem_size
-            result.append(metadata)
+            result.append(metadata.to(self.device))
         if action is not None:
             result.append(action[:, None, :].expand(-1, k, -1))
 
