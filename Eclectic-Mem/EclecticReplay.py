@@ -23,8 +23,8 @@ class EclecticMem(Dataset, Module):
 
         self.obses = np.empty((capacity, *obs_shape), dtype=obs_dtype)
         self.next_obses = np.empty((capacity, *obs_shape), dtype=obs_dtype)
-        self.c = np.empty((capacity, c_size), dtype=obs_dtype)
-        self.next_c = np.empty((capacity, c_size), dtype=obs_dtype)
+        self.c = np.empty((capacity, c_size), dtype=np.float32)
+        self.next_c = np.empty((capacity, c_size), dtype=np.float32)
         self.actions = np.empty((capacity, *action_shape), dtype=np.float32)
         self.rewards = np.empty((capacity, 1), dtype=np.float32)
         self.q = np.empty((capacity, 1), dtype=np.float32)
