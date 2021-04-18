@@ -74,15 +74,15 @@ class EclecticMem(Dataset, Module):
 
     def add(self, obs, c, action, reward, q, next_obs, next_c, done):
 
-        self.obses[self.idx] = torch.from_numpy(obs)
-        np.copyto(self.c[self.idx], c)
-        np.copyto(self.actions[self.idx], action)
-        np.copyto(self.rewards[self.idx], reward)
-        np.copyto(self.q[self.idx], q)
-        np.copyto(self.next_obses[self.idx], next_obs)
-        np.copyto(self.next_c[self.idx], next_c)
-        np.copyto(self.not_dones[self.idx], not done)
-        np.copyto(self.not_dones[self.idx], self.time)
+        self.obses[self.idx] = torch.from_numpy(obs).detach()
+        self.c[self.idx] = c.detach()
+        self.actions[self.idx] = torch.from_numpy(action).detach()
+        self.rewards[self.idx] = reward
+        self.q[self.idx] = q.detach()
+        self.next_obses[self.idx] = torch.from_numpy(next_obs)
+        self.next_c[self.idx] = next_c.detach()
+        self.not_dones[self.idx] = not done
+        self.not_dones[self.idx] = self.time
 
         self.idx = (self.idx + 1) % self.capacity
         self.full = self.full or self.idx == 0
