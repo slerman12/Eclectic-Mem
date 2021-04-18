@@ -74,7 +74,7 @@ class EclecticMem(Dataset, Module):
 
     def add(self, obs, c, action, reward, q, next_obs, next_c, done):
 
-        self.obses[self.idx] = obs
+        self.obses[self.idx] = torch.from_numpy(obs)
         np.copyto(self.c[self.idx], c)
         np.copyto(self.actions[self.idx], action)
         np.copyto(self.rewards[self.idx], reward)
