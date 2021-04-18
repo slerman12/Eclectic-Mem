@@ -315,6 +315,7 @@ def main():
         prev_obs = obs
         prev_c = c
         prev_action = action
+        print(reward.shape, prev_reward.shape, reward[0], prev_reward[0])
         prev_reward = reward
         prev_done_bool = done_bool
         episode_step += 1
