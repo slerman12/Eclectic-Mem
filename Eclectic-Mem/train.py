@@ -308,6 +308,7 @@ def main():
         episode_reward += reward
 
         if step > 0:
+            # TODO add episode step as well
             replay_buffer.add(prev_obs, prev_c, prev_action, prev_reward,
                               prev_reward + (done_bool * args.discount * q), obs, c, prev_done_bool)
 
