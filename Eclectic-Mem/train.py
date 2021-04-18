@@ -301,10 +301,8 @@ def main():
 
         obs, reward, done, _ = env.step(action)
 
-        # allow infinit bootstrap
-        done_bool = 0 if episode_step + 1 == env._max_episode_steps else float(
-            done
-        )
+        # allow infinite bootstrap
+        done_bool = 0 if episode_step + 1 == env._max_episode_steps else float(done)
         episode_reward += reward
 
         if step > 0:
