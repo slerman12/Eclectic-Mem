@@ -2,16 +2,14 @@ import torch
 import numpy as np
 import os
 from torch.utils.data import Dataset
-from torch.nn import Module
 from utils import random_crop
 
 
-class EclecticMem(Dataset, Module):
+class EclecticMem(Dataset):
     """Buffer to store environment transitions."""
 
-    def __init__(self, obs_shape, c_size, action_shape, capacity, batch_size, device, image_size=84, transform=None,
-                 key_size=32, num_heads=1, delta=None, k=80, N=5000):
-        super().__init__()
+    def __init__(self, obs_shape, c_shape, action_shape, capacity, batch_size, device, image_size=84, transform=None,
+                 key_size=32, num_heads=1):
 
         self.capacity = capacity
         self.batch_size = batch_size
@@ -23,8 +21,8 @@ class EclecticMem(Dataset, Module):
 
         self.obses = np.empty((capacity, *obs_shape), dtype=obs_dtype)
         self.next_obses = np.empty((capacity, *obs_shape), dtype=obs_dtype)
-        self.c = np.empty((capacity, c_size), dtype=obs_dtype)
-        self.next_c = np.empty((capacity, c_size), dtype=obs_dtype)
+        self.c = np.empty((capacity, *c_shape), dtype=obs_dtype)
+        self.next_c = np.empty((capacity, *c_shape), dtype=obs_dtype)
         self.actions = np.empty((capacity, *action_shape), dtype=np.float32)
         self.rewards = np.empty((capacity, 1), dtype=np.float32)
         self.q = np.empty((capacity, 1), dtype=np.float32)
@@ -39,13 +37,9 @@ class EclecticMem(Dataset, Module):
 
         self.key_size = key_size
         # TODO can set c_size automatically in self.add()
-        self.head_size = c_size
-        self.c_prime_size = c_size
+        self.head_size = c_shape[-1]
+        self.c_prime_size = c_shape[-1]
         self.num_heads = num_heads
-
-        self.delta = delta
-        self.k = k
-        self.N = N
 
         # This is for dynamic sized value_size in case metadata includes or doesn't include current action
         # TODO just use predefined value size and project metadata to that size; maybe even reuse for q-value & action
@@ -197,7 +191,7 @@ class EclecticMem(Dataset, Module):
     def __len__(self):
         return self.capacity
 
-    def _query(self, c, weigh_q=False, detach_deltas=False, action=None):
+    def _query(self, c, k, delta, weigh_q=False, detach_deltas=False, action=None):
         '''
         c should have batch dimension
         c: concept to query
@@ -208,13 +202,10 @@ class EclecticMem(Dataset, Module):
 
         n = self.capacity if self.full else self.idx
 
-        start = self.idx - self.N if self.full else 0
-        end = self.idx
-
         # TODO set top K to parameters to enable updates, and then retroactively update the stored data
         # TODO however, keep in mind that this can potentially corrupt/modify the original replay actions
-        k = min(self.k, n)
-        deltas = self.delta(c, self.c[start:end])  # B x n
+        k = min(k, n)
+        deltas = delta(c, self.c[:n])  # B x n
         if detach_deltas:
             deltas = deltas.detach()
         deltas, indices = torch.topk(deltas, k=k, dim=1, sorted=False)  # B x k
@@ -227,7 +218,7 @@ class EclecticMem(Dataset, Module):
 
         result = [deltas.unsqueeze(dim=2)]
         for key in ["actions", "rewards", "not_dones", "times", "q"]:
-            metadata = getattr(self, key)[start: end][indices]  # B x k x mem_size
+            metadata = getattr(self, key)[indices]  # B x k x mem_size
             result.append(metadata)
         if action is not None:
             result.append(action[:, None, :].expand(-1, k, -1))
@@ -236,7 +227,7 @@ class EclecticMem(Dataset, Module):
         if weigh_q:
             # B x k x 1, B * k -> B x 1
             # TODO compute q value from reward and next_c/next_obs?
-            expected_q = (self.q[start:end][indices].squeeze(-1) * torch.softmax(deltas, dim=1)).sum(-1).unsqueeze(-1)
+            expected_q = (self.q[indices].squeeze(-1) * torch.softmax(deltas, dim=1)).sum(-1).unsqueeze(-1)
 
         return torch.cat(result, dim=2), expected_q
 
@@ -307,7 +298,7 @@ class EclecticMem(Dataset, Module):
             encoder_module = getattr(self, id + module, self.metadata_encoder[module](metadata))
             setattr(self, module, encoder_module)
 
-    def forward(self, c, weigh_q, action=None, detach_deltas=False, return_expected_q=False, detach=False):
+    def forward(self, c, k, delta, weigh_q, action=None, detach_deltas=False, return_expected_q=False):
         '''
         c should have batch dimension
         c: concept to query
@@ -317,7 +308,8 @@ class EclecticMem(Dataset, Module):
         if self.idx == 0 and not self.full:
             return torch.zeros(c.shape[0], 1).to(self.device) if return_expected_q else c
         # TODO can get rid of weigh_q; just need to update em_sac.py calls to be without it
-        metadata, expected_q = self._query(c, weigh_q or return_expected_q, action=action, detach_deltas=detach_deltas)
+        metadata, expected_q = self._query(c, k, delta, weigh_q or return_expected_q, action=action,
+                                           detach_deltas=detach_deltas)
         if return_expected_q:
             return expected_q
 
@@ -328,8 +320,5 @@ class EclecticMem(Dataset, Module):
         self.set_metadata_encoder(metadata, action=action)
         # TODO embed metadata
         c_prime = self._attend_over_metadata(metadata, embed_metadata=False, project_output=True)
-
-        if detach:
-            c_prime = c_prime.detach()
 
         return c_prime

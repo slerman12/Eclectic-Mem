@@ -9,7 +9,6 @@ import time
 import torch
 
 import utils
-from EclecticReplay import EclecticMem
 from em_sac import EclecticMemCurlSacAgent
 from logger import Logger
 from video import VideoRecorder
@@ -64,11 +63,6 @@ def parse_args():
     parser.add_argument('--init_temperature', default=0.1, type=float)
     parser.add_argument('--alpha_lr', default=1e-4, type=float)
     parser.add_argument('--alpha_beta', default=0.5, type=float)
-    # eclectic-mem
-    parser.add_argument('--key_size', default=32, type=int)
-    parser.add_argument('--num_heads', default=1, type=int)
-    parser.add_argument('--k', default=80, type=int)
-    parser.add_argument('--N', default=5000, type=int)
     # misc
     parser.add_argument('--seed', default=-1, type=int)
     parser.add_argument('--work_dir', default='experiment_ours', type=str)
@@ -78,8 +72,7 @@ def parse_args():
     parser.add_argument('--save_model', default=False, action='store_true')
     parser.add_argument('--detach_encoder', default=False, action='store_true')
 
-    parser.add_argument('--log_interval', default=20, type=int),
-
+    parser.add_argument('--log_interval', default=20, type=int)
     args = parser.parse_args()
     return args
 
@@ -122,7 +115,7 @@ def evaluate(env, agent, video, num_episodes, L, step, args):
     L.dump(step)
 
 
-def make_agent(obs_shape, action_shape, args, device, memory):
+def make_agent(obs_shape, action_shape, args, device):
     if args.agent == 'em_sac':
         return EclecticMemCurlSacAgent(
             obs_shape=obs_shape,
@@ -150,8 +143,7 @@ def make_agent(obs_shape, action_shape, args, device, memory):
             num_filters=args.num_filters,
             log_interval=args.log_interval,
             detach_encoder=args.detach_encoder,
-            curl_latent_dim=args.curl_latent_dim,
-            memory=memory
+            curl_latent_dim=args.curl_latent_dim
 
         )
     else:
@@ -228,26 +220,20 @@ def main():
         obs_shape = env.observation_space.shape
         pre_aug_obs_shape = obs_shape
 
-    replay_buffer = EclecticMem(
+    replay_buffer = utils.ReplayBuffer(
         obs_shape=pre_aug_obs_shape,
-        c_size=args.encoder_feature_dim,
         action_shape=action_shape,
         capacity=args.replay_buffer_capacity,
         batch_size=args.batch_size,
         device=device,
         image_size=args.image_size,
-        key_size=args.key_size,
-        num_heads=args.num_heads,
-        k=args.k,
-        N=args.N
     )
 
     agent = make_agent(
         obs_shape=obs_shape,
         action_shape=action_shape,
         args=args,
-        device=device,
-        memory=replay_buffer
+        device=device
     )
     # Trash line
     L = Logger(args.work_dir, use_tb=args.save_tb)
@@ -286,12 +272,10 @@ def main():
         # sample action for data collection
         if step < args.init_steps:
             action = env.action_space.sample()
-            c = torch.zeros([args.encoder_feature_dim])
-            q = torch.zeros([1])
         else:
             with utils.eval_mode(agent):
                 # print(step, obs.shape, end='        ')
-                action, c, q = agent.sample_action_with_q_value(obs)
+                action = agent.sample_action(obs)
 
         # run training update
         if step >= args.init_steps:
@@ -299,23 +283,17 @@ def main():
             for _ in range(num_updates):
                 agent.update(replay_buffer, L, step)
 
-        obs, reward, done, _ = env.step(action)
+        next_obs, reward, done, _ = env.step(action)
 
         # allow infinit bootstrap
         done_bool = 0 if episode_step + 1 == env._max_episode_steps else float(
             done
         )
         episode_reward += reward
+        # TODO should also store c and use as memory
+        replay_buffer.add(obs, action, reward, next_obs, done_bool)
 
-        if step > 0:
-            replay_buffer.add(prev_obs, prev_c, prev_action, prev_reward,
-                              prev_reward + (done_bool * args.discount * q), obs, c, prev_done_bool)
-
-        prev_obs = obs
-        prev_c = c
-        prev_action = action
-        prev_reward = reward
-        prev_done_bool = done_bool
+        obs = next_obs
         episode_step += 1
 
 
