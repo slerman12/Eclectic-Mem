@@ -21,15 +21,15 @@ class EclecticMem(Dataset, Module):
         # the proprioceptive obs is stored as float32, pixels obs as uint8
         obs_dtype = torch.float32 if len(obs_shape) == 1 else torch.uint8
 
-        self.obses = torch.empty((capacity, *obs_shape), dtype=obs_dtype)
-        self.next_obses = torch.empty((capacity, *obs_shape), dtype=obs_dtype)
-        self.c = torch.empty((capacity, c_size), dtype=torch.float32)
-        self.next_c = torch.empty((capacity, c_size), dtype=torch.float32)
-        self.actions = torch.empty((capacity, *action_shape), dtype=torch.float32)
-        self.rewards = torch.empty((capacity, 1), dtype=torch.float32)
-        self.q = torch.empty((capacity, 1), dtype=torch.float32)
-        self.not_dones = torch.empty((capacity, 1), dtype=torch.float32)
-        self.times = torch.empty((capacity, 1), dtype=torch.float32)
+        self.obses = torch.empty((capacity, *obs_shape), dtype=obs_dtype).to(self.device)
+        self.next_obses = torch.empty((capacity, *obs_shape), dtype=obs_dtype).to(self.device)
+        self.c = torch.empty((capacity, c_size), dtype=torch.float32).to(self.device)
+        self.next_c = torch.empty((capacity, c_size), dtype=torch.float32).to(self.device)
+        self.actions = torch.empty((capacity, *action_shape), dtype=torch.float32).to(self.device)
+        self.rewards = torch.empty((capacity, 1), dtype=torch.float32).to(self.device)
+        self.q = torch.empty((capacity, 1), dtype=torch.float32).to(self.device)
+        self.not_dones = torch.empty((capacity, 1), dtype=torch.float32).to(self.device)
+        self.times = torch.empty((capacity, 1), dtype=torch.float32).to(self.device)
 
         self.idx = 0
         self.last_save = 0
@@ -82,7 +82,7 @@ class EclecticMem(Dataset, Module):
         self.next_obses[self.idx] = torch.from_numpy(next_obs)
         self.next_c[self.idx] = next_c.detach()
         self.not_dones[self.idx] = not done
-        self.not_dones[self.idx] = self.time
+        self.times[self.idx] = self.time
 
         self.idx = (self.idx + 1) % self.capacity
         self.full = self.full or self.idx == 0
