@@ -21,15 +21,15 @@ class EclecticMem(Dataset, Module):
         # the proprioceptive obs is stored as float32, pixels obs as uint8
         obs_dtype = torch.float32 if len(obs_shape) == 1 else torch.uint8
 
-        self.obses = torch.empty((capacity, *obs_shape), dtype=obs_dtype).to(self.device)
-        self.next_obses = torch.empty((capacity, *obs_shape), dtype=obs_dtype).to(self.device)
-        self.c = torch.empty((capacity, c_size), dtype=torch.float32).to(self.device)
-        self.next_c = torch.empty((capacity, c_size), dtype=torch.float32).to(self.device)
-        self.actions = torch.empty((capacity, *action_shape), dtype=torch.float32).to(self.device)
-        self.rewards = torch.empty((capacity, 1), dtype=torch.float32).to(self.device)
-        self.q = torch.empty((capacity, 1), dtype=torch.float32).to(self.device)
-        self.not_dones = torch.empty((capacity, 1), dtype=torch.float32).to(self.device)
-        self.times = torch.empty((capacity, 1), dtype=torch.float32).to(self.device)
+        self.obses = torch.empty((capacity, *obs_shape), dtype=obs_dtype)
+        self.next_obses = torch.empty((capacity, *obs_shape), dtype=obs_dtype)
+        self.c = torch.empty((capacity, c_size), dtype=torch.float32)
+        self.next_c = torch.empty((capacity, c_size), dtype=torch.float32)
+        self.actions = torch.empty((capacity, *action_shape), dtype=torch.float32)
+        self.rewards = torch.empty((capacity, 1), dtype=torch.float32)
+        self.q = torch.empty((capacity, 1), dtype=torch.float32)
+        self.not_dones = torch.empty((capacity, 1), dtype=torch.float32)
+        self.times = torch.empty((capacity, 1), dtype=torch.float32)
 
         self.idx = 0
         self.last_save = 0
@@ -82,7 +82,7 @@ class EclecticMem(Dataset, Module):
         self.next_obses[self.idx] = torch.from_numpy(next_obs)
         self.next_c[self.idx] = next_c.detach()
         self.not_dones[self.idx] = not done
-        self.times[self.idx] = self.time
+        self.not_dones[self.idx] = self.time
 
         self.idx = (self.idx + 1) % self.capacity
         self.full = self.full or self.idx == 0
@@ -100,9 +100,7 @@ class EclecticMem(Dataset, Module):
         obses = torch.as_tensor(obses, device=self.device).float()
         actions = torch.as_tensor(self.actions[idxs], device=self.device)
         rewards = torch.as_tensor(self.rewards[idxs], device=self.device)
-        next_obses = torch.as_tensor(
-            next_obses, device=self.device
-        ).float()
+        next_obses = torch.as_tensor(next_obses, device=self.device).float()
         not_dones = torch.as_tensor(self.not_dones[idxs], device=self.device)
         return obses, actions, rewards, next_obses, not_dones
 
@@ -123,9 +121,7 @@ class EclecticMem(Dataset, Module):
         pos = random_crop(pos, self.image_size)
 
         obses = torch.as_tensor(obses, device=self.device).float()
-        next_obses = torch.as_tensor(
-            next_obses, device=self.device
-        ).float()
+        next_obses = torch.as_tensor(next_obses, device=self.device).float()
         actions = torch.as_tensor(self.actions[self.idxs], device=self.device)
         rewards = torch.as_tensor(self.rewards[self.idxs], device=self.device)
         not_dones = torch.as_tensor(self.not_dones[self.idxs], device=self.device)
@@ -214,7 +210,8 @@ class EclecticMem(Dataset, Module):
         # TODO set top K to parameters to enable updates, and then retroactively update the stored data
         # TODO however, keep in mind that this can potentially corrupt/modify the original replay actions
         k = min(self.k, n)
-        deltas = self.delta(c, self.c[start:end])  # B x n
+        past_c = torch.as_tensor(self.c[start:end], device=self.device).float()
+        deltas = self.delta(c, past_c)  # B x n
         if detach_deltas:
             deltas = deltas.detach()
         deltas, indices = torch.topk(deltas, k=k, dim=1, sorted=False)  # B x k
