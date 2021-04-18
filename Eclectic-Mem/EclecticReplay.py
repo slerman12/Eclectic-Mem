@@ -113,9 +113,9 @@ class EclecticMem(Dataset, Module):
         next_obses = self.next_obses[idxs]
         pos = obses.clone()
 
-        obses = random_crop(obses, self.image_size)
-        next_obses = random_crop(next_obses, self.image_size)
-        pos = random_crop(pos, self.image_size)
+        obses = random_crop(obses.numpy(), self.image_size)
+        next_obses = random_crop(next_obses.numpy(), self.image_size)
+        pos = random_crop(pos.numpy(), self.image_size)
 
         obses = torch.as_tensor(obses, device=self.device).float()
         next_obses = torch.as_tensor(next_obses, device=self.device).float()
