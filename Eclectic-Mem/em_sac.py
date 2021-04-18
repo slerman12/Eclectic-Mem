@@ -332,6 +332,8 @@ class EclecticMemCurlSacAgent(object):
             encoder_feature_dim, num_layers, num_filters, memory
         ).to(device)
 
+        self.memory = memory
+
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         # tie encoders between actor and critic, and CURL and critic
@@ -549,7 +551,7 @@ class EclecticMemCurlSacAgent(object):
 
     def save_em(self, model_dir, step):
         torch.save(
-            self.EclecticMem.state_dict(), '%s/em_%s.pt' % (model_dir, step)
+            self.memory.state_dict(), '%s/em_%s.pt' % (model_dir, step)
         )
 
     def load(self, model_dir, step):
