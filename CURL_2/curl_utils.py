@@ -145,7 +145,7 @@ class ReplayBuffer(Dataset, Module):
         self.next_obses[self.idx] = torch.from_numpy(next_obs).detach()
         # self.next_c[self.idx] = next_c.detach()
         self.not_dones[self.idx] = not done
-        self.times[self.idx] = self.time
+        # self.times[self.idx] = self.time
 
         self.idx = (self.idx + 1) % self.capacity
         self.full = self.full or self.idx == 0
