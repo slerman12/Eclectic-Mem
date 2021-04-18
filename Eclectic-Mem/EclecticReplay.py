@@ -104,16 +104,13 @@ class EclecticMem(Dataset, Module):
         not_dones = torch.as_tensor(self.not_dones[idxs], device=self.device)
         return obses, actions, rewards, next_obses, not_dones
 
-    def sample_cpc(self, j):
+    def sample_cpc(self):
 
-        if j == 0:
-            self.idxs = np.random.randint(
-                0, self.capacity if self.full else self.idx, size=self.batch_size
-            )
-        else:
-            self.idxs += 1
-        obses = self.obses[self.idxs]
-        next_obses = self.next_obses[self.idxs]
+        idxs = np.random.randint(
+            0, self.capacity if self.full else self.idx, size=self.batch_size)
+
+        obses = self.obses[idxs]
+        next_obses = self.next_obses[idxs]
         pos = obses.copy()
 
         obses = random_crop(obses, self.image_size)
@@ -122,9 +119,9 @@ class EclecticMem(Dataset, Module):
 
         obses = torch.as_tensor(obses, device=self.device).float()
         next_obses = torch.as_tensor(next_obses, device=self.device).float()
-        actions = torch.as_tensor(self.actions[self.idxs], device=self.device)
-        rewards = torch.as_tensor(self.rewards[self.idxs], device=self.device)
-        not_dones = torch.as_tensor(self.not_dones[self.idxs], device=self.device)
+        actions = torch.as_tensor(self.actions[idxs], device=self.device)
+        rewards = torch.as_tensor(self.rewards[idxs], device=self.device)
+        not_dones = torch.as_tensor(self.not_dones[idxs], device=self.device)
 
         pos = torch.as_tensor(pos, device=self.device).float()
         cpc_kwargs = dict(obs_anchor=obses, obs_pos=pos,
