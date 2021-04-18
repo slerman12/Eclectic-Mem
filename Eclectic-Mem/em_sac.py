@@ -513,10 +513,10 @@ class EclecticMemCurlSacAgent(object):
         if step % self.log_interval == 0:
             L.log('train/batch_reward', reward.mean(), step)
 
-        self.update_critic(obs, action, reward, next_obs, not_done, L, step, replay_buffer)
+        self.update_critic(obs, action, reward, next_obs, not_done, L, step)
 
         if step % self.actor_update_freq == 0:
-            self.update_actor_and_alpha(obs, L, step, replay_buffer)
+            self.update_actor_and_alpha(obs, L, step)
 
         if step % self.critic_target_update_freq == 0:
             utils.soft_update_params(
