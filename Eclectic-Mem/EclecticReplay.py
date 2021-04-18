@@ -185,8 +185,7 @@ class EclecticMem(Dataset, Module):
             obs = self.transform(obs)
             next_obs = self.transform(next_obs)
 
-        # return obs, c, action, reward, q, next_obs, next_c, not_done, time
-        return obs, action, reward, next_obs, not_done
+        return obs, c, action, reward, q, next_obs, next_c, not_done, time
 
     def __len__(self):
         return self.capacity
