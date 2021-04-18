@@ -311,11 +311,11 @@ def main():
             # TODO add episode step as well
             replay_buffer.add(prev_obs, prev_c, prev_action, prev_reward,
                               prev_reward + (done_bool * args.discount * q), obs, c, prev_done_bool)
+            print(reward, prev_reward)
 
         prev_obs = obs
         prev_c = c
         prev_action = action
-        print(reward, prev_reward)
         prev_reward = reward
         prev_done_bool = done_bool
         episode_step += 1
