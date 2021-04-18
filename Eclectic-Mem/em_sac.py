@@ -424,6 +424,7 @@ class EclecticMemCurlSacAgent(object):
             return pi.cpu().data.numpy().flatten(), c, q
 
     def update_critic(self, obs, action, reward, next_obs, not_done, L, step):
+        print(obs.shape, next_obs.shape)
         with torch.no_grad():
             # TODO can compute similarity-weighted past q-values but otherwise output from c, no c_prime
             _, policy_action, log_pi, _ = self.actor(next_obs)
