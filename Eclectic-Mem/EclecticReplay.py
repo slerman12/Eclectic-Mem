@@ -307,7 +307,7 @@ class EclecticMem(Dataset, Module):
             encoder_module = getattr(self, id + module, self.metadata_encoder[module](metadata))
             setattr(self, module, encoder_module)
 
-    def forward(self, c, weigh_q, action=None, detach_deltas=False, return_expected_q=False, detach=False):
+    def forward(self, c, weigh_q=False, action=None, detach_deltas=False, return_expected_q=False, detach=False):
         '''
         c should have batch dimension
         c: concept to query
