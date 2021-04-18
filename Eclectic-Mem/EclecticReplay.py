@@ -79,7 +79,7 @@ class EclecticMem(Dataset, Module):
         self.actions[self.idx] = torch.from_numpy(action).detach()
         self.rewards[self.idx] = reward
         self.q[self.idx] = q.detach()
-        self.next_obses[self.idx] = torch.from_numpy(next_obs)
+        self.next_obses[self.idx] = torch.from_numpy(next_obs).detach()
         self.next_c[self.idx] = next_c.detach()
         self.not_dones[self.idx] = not done
         self.not_dones[self.idx] = self.time
