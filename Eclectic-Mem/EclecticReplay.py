@@ -111,7 +111,7 @@ class EclecticMem(Dataset, Module):
 
         obses = self.obses[idxs]
         next_obses = self.next_obses[idxs]
-        pos = obses.copy()
+        pos = obses.clone()
 
         obses = random_crop(obses, self.image_size)
         next_obses = random_crop(next_obses, self.image_size)
