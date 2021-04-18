@@ -276,9 +276,16 @@ def main(rank):
         # allow infinite bootstrap
         done_bool = 0 if episode_step + 1 == env._max_episode_steps else float(done)
         episode_reward += reward
-        replay_buffer.add(obs, action, reward, next_obs, done_bool)
 
-        obs = next_obs
+        if step > 0:
+            # TODO add episode step as well
+            replay_buffer.add(prev_obs, prev_action, prev_reward, obs, prev_done_bool)
+
+        prev_obs = obs
+        # prev_c = c
+        prev_action = action
+        prev_reward = reward
+        prev_done_bool = done_bool
         episode_step += 1
 
 
