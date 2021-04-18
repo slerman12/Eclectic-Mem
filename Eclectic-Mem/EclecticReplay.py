@@ -6,7 +6,7 @@ from torch.nn import Module
 from utils import random_crop
 
 
-class EclecticMem(Dataset, Module):
+class EclecticMem(Dataset):
     """Buffer to store environment transitions."""
 
     def __init__(self, obs_shape, c_size, action_shape, capacity, batch_size, device, image_size=84, transform=None,
