@@ -280,14 +280,13 @@ def main(rank):
 
         if step > 0:
             # TODO add episode step as well
-            replay_buffer.add(prev_obs, prev_action, prev_reward, prev_next_obs, prev_done_bool)
+            replay_buffer.add(prev_obs, prev_action, prev_reward, obs, prev_done_bool)
         # replay_buffer.add(obs, action, reward, next_obs, done_bool)
 
         # obs = next_obs
 
         prev_obs = obs
         obs = next_obs
-        prev_next_obs = next_obs
         # prev_c = c
         prev_action = action
         prev_reward = reward

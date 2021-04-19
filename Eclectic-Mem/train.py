@@ -299,7 +299,7 @@ def main():
             for _ in range(num_updates):
                 agent.update(replay_buffer, L, step)
 
-        obs, reward, done, _ = env.step(action)
+        next_obs, reward, done, _ = env.step(action)
 
         # allow infinite bootstrap
         done_bool = 0 if episode_step + 1 == env._max_episode_steps else float(done)
@@ -311,6 +311,7 @@ def main():
                               prev_reward + (prev_done_bool * args.discount * q), obs, c, prev_done_bool)
 
         prev_obs = obs
+        obs = next_obs
         prev_c = c
         prev_action = action
         prev_reward = reward
