@@ -459,11 +459,13 @@ class EclecticMemCurlSacAgent(object):
         self.critic.log(L, step)
 
     def update_actor_and_alpha(self, obs, L, step):
-        # detach encoder, so we don't update it with the actor loss
+        # detach encoder, so we don't update it with the actor loss TODO should it?
         _, pi, log_pi, log_std = self.actor(obs, detach_encoder=True)
+        # TODO torch.no_grad? Will q val still overestimate in this case?
         actor_Q1, actor_Q2, actor_Q3 = self.critic(obs, pi, detach_encoder=True)
 
         actor_Q = torch.min(actor_Q1, actor_Q2)
+        # entropy, q value maximization
         actor_loss = (self.alpha.detach() * log_pi - actor_Q).mean()
 
         if step % self.log_interval == 0:
