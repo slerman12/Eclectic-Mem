@@ -235,6 +235,7 @@ class EclecticMem(Dataset, Module):
         # self.q[indices] = self.rewards[indices] + compute_q(self.next_c[indices])
 
         result = [deltas.unsqueeze(dim=2), self.time - get_last_N(self.times)[indices]]
+        print(result[1].max() * 1000, result[1].min() * 1000)
         for key in ["actions", "rewards", "not_dones", "episode_steps", "q"]:
             metadata = get_last_N(getattr(self, key))[indices]  # B x k x mem_size
             result.append(metadata.to(self.device))
