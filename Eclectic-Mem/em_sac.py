@@ -155,8 +155,8 @@ class Critic(nn.Module):
             num_filters, output_logits=True
         )
 
-        # c_shape = self.encoder.feature_dim
-        c_shape = self.encoder.feature_dim * 2
+        c_shape = self.encoder.feature_dim
+        # c_shape = self.encoder.feature_dim * 2
 
         self.Q1 = QFunction(
             c_shape, action_shape[0], hidden_dim
@@ -178,11 +178,11 @@ class Critic(nn.Module):
         c = self.encoder(obs, detach=detach_encoder)
 
         # expected_q = self.memory(c, action=action, detach_deltas=False, return_expected_q=True)
-        c_prime = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
-        c_prime = torch.cat([c, c_prime], dim=-1)
+        # c_prime = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
+        # c_prime = torch.cat([c, c_prime], dim=-1)
 
-        q1 = self.Q1(c_prime, action)
-        q2 = self.Q2(c_prime, action)
+        q1 = self.Q1(c, action)
+        q2 = self.Q2(c, action)
         # q3 = self.Q3(c_prime, action)
         # q3 = expected_q
         q3 = None
