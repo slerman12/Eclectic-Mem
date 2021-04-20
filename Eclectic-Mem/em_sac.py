@@ -184,6 +184,7 @@ class Critic(nn.Module):
 
         q1 = self.Q1(c_prime, action)
         q2 = self.Q2(c_prime, action)
+
         # q3 = self.Q3(c_prime, action)
         # q3 = expected_q
         q3 = None
