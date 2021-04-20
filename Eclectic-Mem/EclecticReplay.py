@@ -221,7 +221,7 @@ class EclecticMem(Dataset, Module):
             deltas = deltas.detach()
         deltas, indices = torch.topk(deltas, k=k, dim=1, sorted=False)  # B x k
 
-        print(deltas.shape, indices.shape, indices.min(), indices.max(), indices[0])
+        print(self.n, indices.min(), indices.max())
 
         # TODO recompute c?
         # self.c[indices] = compute_c(self.obses[indices])
