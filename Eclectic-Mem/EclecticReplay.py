@@ -234,8 +234,8 @@ class EclecticMem(Dataset, Module):
         # TODO compute q value from reward and next_c/next_obs?
         # self.q[indices] = self.rewards[indices] + compute_q(self.next_c[indices])
 
-        result = [deltas.unsqueeze(dim=2)]
-        for key in ["actions", "rewards", "not_dones", "times", "episode_steps", "q"]:
+        result = [deltas.unsqueeze(dim=2), self.time - get_last_N(self.times)[indices]]
+        for key in ["actions", "rewards", "not_dones", "episode_steps", "q"]:
             metadata = get_last_N(getattr(self, key))[indices]  # B x k x mem_size
             result.append(metadata.to(self.device))
         if action is not None:
