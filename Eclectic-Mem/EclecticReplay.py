@@ -30,6 +30,7 @@ class EclecticMem(Dataset, Module):
         self.q = torch.empty((capacity, 1), dtype=torch.float32)
         self.not_dones = torch.empty((capacity, 1), dtype=torch.float32)
         self.times = torch.empty((capacity, 1), dtype=torch.float32)
+        self.episode_steps = torch.empty((capacity, 1), dtype=torch.float32)
 
         self.idx = 0
         self.last_save = 0
@@ -72,7 +73,7 @@ class EclecticMem(Dataset, Module):
                                                                                              self.c_prime_size)
                                                             ).to(self.device)}
 
-    def add(self, obs, c, action, reward, q, next_obs, next_c, done):
+    def add(self, obs, c, action, reward, q, next_obs, next_c, done, episode_step):
 
         self.obses[self.idx] = torch.from_numpy(obs).detach()
         self.c[self.idx] = c.detach()
@@ -83,6 +84,7 @@ class EclecticMem(Dataset, Module):
         self.next_c[self.idx] = next_c.detach()
         self.not_dones[self.idx] = not done
         self.times[self.idx] = self.time
+        self.episode_steps[self.idx] = episode_step
 
         self.idx = (self.idx + 1) % self.capacity
         self.full = self.full or self.idx == 0
@@ -142,7 +144,8 @@ class EclecticMem(Dataset, Module):
             self.rewards[self.last_save:self.idx],
             self.q[self.last_save:self.idx],
             self.not_dones[self.last_save:self.idx],
-            self.times[self.last_save:self.idx]
+            self.times[self.last_save:self.idx],
+            self.episode_steps[self.last_save:self.idx]
         ]
         self.last_save = self.idx
         torch.save(payload, path)
@@ -164,6 +167,7 @@ class EclecticMem(Dataset, Module):
             self.q[start:end] = payload[6]
             self.not_dones[start:end] = payload[7]
             self.times[start:end] = payload[8]
+            self.episode_steps[start:end] = payload[9]
             self.idx = end
 
     def __getitem__(self, idx):
@@ -180,12 +184,13 @@ class EclecticMem(Dataset, Module):
         next_c = self.next_c[idx]
         not_done = self.not_dones[idx]
         time = self.times[idx]
+        episode_step = self.episode_steps[idx]
 
         if self.transform:
             obs = self.transform(obs)
             next_obs = self.transform(next_obs)
 
-        return obs, c, action, reward, q, next_obs, next_c, not_done, time
+        return obs, c, action, reward, q, next_obs, next_c, not_done, time, episode_step
 
     def __len__(self):
         return self.capacity
@@ -230,7 +235,7 @@ class EclecticMem(Dataset, Module):
         # self.q[indices] = self.rewards[indices] + compute_q(self.next_c[indices])
 
         result = [deltas.unsqueeze(dim=2)]
-        for key in ["actions", "rewards", "not_dones", "times", "q"]:
+        for key in ["actions", "rewards", "not_dones", "times", "episode_steps", "q"]:
             metadata = get_last_N(getattr(self, key))[indices]  # B x k x mem_size
             result.append(metadata.to(self.device))
         if action is not None:
