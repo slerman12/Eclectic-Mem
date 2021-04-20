@@ -201,18 +201,27 @@ class EclecticMem(Dataset, Module):
 
         n = self.capacity if self.full else self.idx
 
-        start = self.idx - self.N if self.full else 0
+        start = self.idx - self.N if self.full or self.idx >= self.N else 0
         end = self.idx
+
+        def get_last_N(x):
+            if self.full and self.idx < self.N:
+                # TODO preallocate
+                return torch.cat((x[end:], x[:start]), dim=0)
+            else:
+                return x[start:end]
 
         # TODO set top K to parameters to enable updates, and then retroactively update the stored data
         # TODO however, keep in mind that this can potentially corrupt/modify the original replay actions
         k = min(self.k, n)
         # TODO maybe the computation should just happen on CPU since copying memory to GPU might be very expensive
-        past_c = torch.as_tensor(self.c[start:end], device=self.device).float()
+        past_c = torch.as_tensor(get_last_N(self.c), device=self.device).float()
         deltas = self.delta(c, past_c)  # B x n
         if detach_deltas:
             deltas = deltas.detach()
         deltas, indices = torch.topk(deltas, k=k, dim=1, sorted=False)  # B x k
+
+        print(indices.shape, indices.min(), indices.max(), indices[0])
 
         # TODO recompute c?
         # self.c[indices] = compute_c(self.obses[indices])
@@ -222,7 +231,7 @@ class EclecticMem(Dataset, Module):
 
         result = [deltas.unsqueeze(dim=2)]
         for key in ["actions", "rewards", "not_dones", "times", "q"]:
-            metadata = getattr(self, key)[start: end][indices]  # B x k x mem_size
+            metadata = get_last_N(getattr(self, key))[indices]  # B x k x mem_size
             result.append(metadata.to(self.device))
         if action is not None:
             result.append(action[:, None, :].expand(-1, k, -1))
@@ -231,7 +240,7 @@ class EclecticMem(Dataset, Module):
         if weigh_q:
             # B x k x 1, B * k -> B x 1
             # TODO compute q value from reward and next_c/next_obs?
-            expected_q = (self.q[start:end][indices].squeeze(-1) * torch.softmax(deltas, dim=1)).sum(-1).unsqueeze(-1)
+            expected_q = (get_last_N(self.q)[indices].squeeze(-1) * torch.softmax(deltas, dim=1)).sum(-1).unsqueeze(-1)
 
         return torch.cat(result, dim=2), expected_q
 
