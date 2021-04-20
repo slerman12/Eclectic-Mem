@@ -206,6 +206,7 @@ class EclecticMem(Dataset, Module):
 
         n = self.capacity if self.full else self.idx
 
+        # TODO might also consider just subsampling
         start = self.idx - self.N if self.full or self.idx >= self.N else 0
         end = self.idx
 
