@@ -22,7 +22,7 @@ def parse_args():
     parser.add_argument('--domain_name', default='cartpole')
     parser.add_argument('--task_name', default='swingup')
     parser.add_argument('--expname', default=None)
-    parser.add_argument('--pre_transform_image_size', default=100, type=int)
+    parser.add_argument('--pre_transform_image_size', default=84, type=int)
 
     parser.add_argument('--image_size', default=84, type=int)
     parser.add_argument('--action_repeat', default=8, type=int)
