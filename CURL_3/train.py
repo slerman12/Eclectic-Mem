@@ -263,6 +263,7 @@ def main(rank):
             action = env.action_space.sample()
         else:
             with curl_utils.eval_mode(agent):
+                print(obs.shape)
                 action = agent.sample_action(obs)
 
         # run training update
