@@ -438,14 +438,16 @@ class CurlSacAgent(object):
         # reshape B, B (both)
         # cross L2 (B, B) -> detach -> q_differences
 
-        logits, q_L2, z_a_q, z_pos_q = self.CURL(z_a, z_pos, action, self.critic)
-        q_L2.fill_diagonal_(0)
-        labels = torch.arange(logits.shape[0]).long().to(self.device)
+        logits = self.CURL(z_a, z_pos)
+
+        # logits, q_L2, z_a_q, z_pos_q = self.CURL(z_a, z_pos, action, self.critic)
+        # q_L2.fill_diagonal_(0)
+        # labels = torch.arange(logits.shape[0]).long().to(self.device)
         # TODO do we need the cross entropy? do i need beta, omega in cross entropy?
         # TODO should softmax be over dim or over all?
         loss = self.cross_entropy_loss(logits, labels) \
-               + (torch.softmax((logits + self.omega) * self.beta) * q_L2).sum() \
-               + self.mse(z_a_q, z_pos_q)
+               # + (torch.softmax((logits + self.omega) * self.beta) * q_L2).sum() \
+               # + self.mse(z_a_q, z_pos_q)
 
         self.encoder_optimizer.zero_grad()
         self.cpc_optimizer.zero_grad()
