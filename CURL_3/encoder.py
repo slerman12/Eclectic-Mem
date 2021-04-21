@@ -58,7 +58,6 @@ class PixelEncoder(nn.Module):
         return h
 
     def forward(self, obs, detach=False):
-        print(obs.shape)
         h = self.forward_conv(obs)
 
         if detach:
