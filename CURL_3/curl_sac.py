@@ -360,8 +360,8 @@ class CurlSacAgent(object):
             return mu.cpu().data.numpy().flatten()
 
     def sample_action(self, obs):
-        if obs.shape[-1] != self.image_size:
-            obs = curl_utils.center_crop_image(obs, self.image_size)
+        # if obs.shape[-1] != self.image_size:
+        #     obs = curl_utils.center_crop_image(obs, self.image_size)
 
         with torch.no_grad():
             obs = torch.FloatTensor(obs).to(self.device)
