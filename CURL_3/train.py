@@ -232,7 +232,8 @@ def main(rank):
 
     for step in range(args.num_train_steps):
         # evaluate agent periodically
-        print(obs.shape)
+        if step > 0:
+            print(obs.shape)
 
         if step % args.eval_freq == 0:
             L.log('eval/episode', episode, step)
