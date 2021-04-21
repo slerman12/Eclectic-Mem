@@ -63,7 +63,7 @@ class PixelEncoder(nn.Module):
         if detach:
             h = h.detach()
 
-        print(h.shape, self.fc.weight)
+        print(h.shape, self.fc.weight.shape)
         h_fc = self.fc(h)
         self.outputs['fc'] = h_fc
 
