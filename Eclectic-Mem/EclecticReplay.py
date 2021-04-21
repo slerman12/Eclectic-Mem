@@ -3,14 +3,14 @@ import numpy as np
 import os
 from torch.utils.data import Dataset
 from torch.nn import Module
-from utils import random_crop
+import kornia
 
 
 class EclecticMem(Dataset, Module):
     """Buffer to store environment transitions."""
 
     def __init__(self, obs_shape, c_size, action_shape, capacity, batch_size, device, image_size=84, transform=None,
-                 key_size=32, num_heads=1, delta=None, k=80, N=5000):
+                 key_size=32, num_heads=1, delta=None, k=80, N=5000, image_pad=4):
         super().__init__()
 
         self.capacity = capacity
@@ -47,6 +47,10 @@ class EclecticMem(Dataset, Module):
         self.delta = delta
         self.k = k
         self.N = N
+
+        self.aug_trans = torch.nn.Sequential(
+            torch.nn.ReplicationPad2d(image_pad),
+            kornia.augmentation.RandomCrop((obs_shape[-1], obs_shape[-1])))
 
         # This is for dynamic sized value_size in case metadata includes or doesn't include current action
         # TODO just use predefined value size and project metadata to that size; maybe even reuse for q-value & action
@@ -115,10 +119,6 @@ class EclecticMem(Dataset, Module):
         next_obses = self.next_obses[idxs]
         pos = obses.clone().detach()
 
-        obses = random_crop(obses.numpy(), self.image_size)
-        next_obses = random_crop(next_obses.numpy(), self.image_size)
-        pos = random_crop(pos.numpy(), self.image_size)
-
         obses = torch.as_tensor(obses, device=self.device).float()
         next_obses = torch.as_tensor(next_obses, device=self.device).float()
         actions = torch.as_tensor(self.actions[idxs], device=self.device)
@@ -126,6 +126,8 @@ class EclecticMem(Dataset, Module):
         not_dones = torch.as_tensor(self.not_dones[idxs], device=self.device)
 
         pos = torch.as_tensor(pos, device=self.device).float()
+        pos = self.aug_trans(pos)
+
         cpc_kwargs = dict(obs_anchor=obses, obs_pos=pos,
                           time_anchor=None, time_pos=None)
 
