@@ -225,6 +225,7 @@ class EclecticMem(Dataset, Module):
         deltas = self.delta(c, past_c)  # B x n
         if detach_deltas:
             deltas = deltas.detach()
+        # TODO instead of top k consider retrieving all above certain threshold, then subsampling those by past q value
         deltas, indices = torch.topk(deltas, k=k, dim=1, sorted=False)  # B x k
 
         # print(n, indices.min(), indices.max())
@@ -237,6 +238,16 @@ class EclecticMem(Dataset, Module):
 
         result = [deltas.unsqueeze(dim=2), self.time - get_last_N(self.times)[indices]]
         print(result[1].max() * 1000, result[1].min() * 1000)
+        # TODO compute q from traces up to done or horizon
+        # TODO compute q from stored next_c or next_obs (with no grad?), update q in this way
+        # TODO compute q from cumulative discounted sum of next indices until done?
+        # TODO the current concept c_t and the memory action a_m can be fed into critic
+        #  and the output similarity weighted averaged and maximized! (To increase similarity between concepts
+        #  with related best actions!) (the critic part could be with no grad)
+        #  Some filtering of negative samples would be good too by min cutoff
+        # TODO or rather convolve taken action across memory conceots and similarity weighted average critic q vals
+        #  of each to predict q val. maybe multiply/divide by weight beta to allow model to learn softmax temp
+        # TODO get similar above certain threshold (.9), get top q-val mem
         for key in ["actions", "rewards", "not_dones", "episode_steps", "q"]:
             metadata = get_last_N(getattr(self, key))[indices]  # B x k x mem_size
             result.append(metadata.to(self.device))

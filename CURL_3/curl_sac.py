@@ -2,11 +2,11 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-
-import utils
-from encoder import make_encoder
-
+import copy
+import math
 from torch.nn.parallel import DistributedDataParallel as DDP
+import curl_utils
+from encoder import make_encoder
 
 LOG_FREQ = 10000
 
@@ -49,7 +49,7 @@ class Actor(nn.Module):
 
     def __init__(
             self, obs_shape, action_shape, hidden_dim, encoder_type,
-            encoder_feature_dim, log_std_min, log_std_max, num_layers, num_filters, memory
+            encoder_feature_dim, log_std_min, log_std_max, num_layers, num_filters
     ):
         super().__init__()
 
@@ -63,7 +63,6 @@ class Actor(nn.Module):
 
         self.trunk = nn.Sequential(
             nn.Linear(self.encoder.feature_dim, hidden_dim), nn.ReLU(),
-            # nn.Linear(self.encoder.feature_dim * 2, hidden_dim), nn.ReLU(),
             nn.Linear(hidden_dim, hidden_dim), nn.ReLU(),
             nn.Linear(hidden_dim, 2 * action_shape[0])
         )
@@ -71,18 +70,12 @@ class Actor(nn.Module):
         self.outputs = dict()
         self.apply(weight_init)
 
-        self.memory = memory
-
     def forward(
             self, obs, compute_pi=True, compute_log_pi=True, detach_encoder=False
     ):
-        c = self.encoder(obs, detach=detach_encoder)
+        obs = self.encoder(obs, detach=detach_encoder)
 
-        # c_prime = self.memory(c, detach_deltas=False, return_expected_q=False)
-        # c_prime = torch.cat([c, c_prime], dim=-1)
-
-        mu, log_std = self.trunk(c).chunk(2, dim=-1)
-        # mu, log_std = self.trunk(c_prime).chunk(2, dim=-1)
+        mu, log_std = self.trunk(obs).chunk(2, dim=-1)
 
         # constrain log_std inside [log_std_min, log_std_max]
         log_std = torch.tanh(log_std)
@@ -146,7 +139,7 @@ class Critic(nn.Module):
 
     def __init__(
             self, obs_shape, action_shape, hidden_dim, encoder_type,
-            encoder_feature_dim, num_layers, num_filters, memory
+            encoder_feature_dim, num_layers, num_filters
     ):
         super().__init__()
 
@@ -155,51 +148,27 @@ class Critic(nn.Module):
             num_filters, output_logits=True
         )
 
-        # c_shape = self.encoder.feature_dim
-        c_shape = self.encoder.feature_dim * 2
-
         self.Q1 = QFunction(
-            c_shape, action_shape[0], hidden_dim
+            self.encoder.feature_dim, action_shape[0], hidden_dim
         )
         self.Q2 = QFunction(
-            c_shape, action_shape[0], hidden_dim
-        )
-        self.Q3 = QFunction(
-            c_shape, action_shape[0], hidden_dim
+            self.encoder.feature_dim, action_shape[0], hidden_dim
         )
 
         self.outputs = dict()
         self.apply(weight_init)
 
-        self.memory = memory
-
-    def forward(self, obs, action, detach_encoder=False, return_c=False):
+    def forward(self, obs, action, detach_encoder=False):
         # detach_encoder allows to stop gradient propogation to encoder
-        c = self.encoder(obs, detach=detach_encoder)
+        obs = self.encoder(obs, detach=detach_encoder)
 
-        # expected_q = self.memory(c, action=action, detach_deltas=False, return_expected_q=True)
-        # c_prime = c
-        c_prime = self.memory(c, action=action, detach_deltas=False, return_expected_q=False)
-        c_prime = torch.cat([c, c_prime], dim=-1)
-
-        q1 = self.Q1(c_prime, action)
-        q2 = self.Q2(c_prime, action)
-
-        # q3 = self.Q3(c_prime, action)
-        # q3 = expected_q
-        q3 = None
+        q1 = self.Q1(obs, action)
+        q2 = self.Q2(obs, action)
 
         self.outputs['q1'] = q1
         self.outputs['q2'] = q2
-        self.outputs['q3'] = q3
 
-        if return_c:
-            self.outputs['c'] = c
-            # self.outputs['c_prime'] = c_prime
-            # return q1, q2, c, c_prime
-            return q1, q2, q3, c
-
-        return q1, q2, q3
+        return q1, q2
 
     def log(self, L, step, log_freq=LOG_FREQ):
         if step % log_freq != 0:
@@ -231,7 +200,7 @@ class CURL(nn.Module):
         self.W = nn.Parameter(torch.rand(z_dim, z_dim))
         self.output_type = output_type
 
-    def encode(self, x, detach=False, ema=False, action=None):
+    def encode(self, x, detach=False, ema=False):
         """
         Encoder: z_t = e(x_t)
         :param x: x_t, x y coordinates
@@ -240,21 +209,14 @@ class CURL(nn.Module):
         if ema:
             with torch.no_grad():
                 z_out = self.encoder_target(x)
-                if action is not None:
-                    action_embed = self.action_encoder(action)
-                    z_out = torch.cat([z_out, action_embed], dim=-1)
         else:
             z_out = self.encoder(x)
-            if action is not None:
-                action_embed = self.action_encoder(action)
-                z_out = torch.cat([z_out, action_embed], dim=-1)
 
         if detach:
             z_out = z_out.detach()
-
         return z_out
 
-    def compute_logits(self, z_a, z_pos):
+    def forward(self, z_a, z_pos):
         """
         Uses logits trick for CURL:
         - compute (B,B) matrix z_a (W z_pos.T)
@@ -262,31 +224,21 @@ class CURL(nn.Module):
         - negatives are all other elements
         - to compute loss use multiclass cross entropy with identity matrix for labels
         """
-        # TODO add action encodings to the CL (store encodings in memory instead of actions)
         Wz = torch.matmul(self.W, z_pos.T)  # (z_dim,B)
         logits = torch.matmul(z_a, Wz)  # (B,B)
-        # euclidean distance like NEC
-        # z_a = torch.matmul(z_a, self.W)
-        # z_pos = torch.matmul(z_pos, self.W)
-        # TODO dim?
-        # logits = torch.cdist(z_a, z_pos, p=2)
-        # TODO maximize based on quadratic q value sum with positives maxed out (q value distribution similarity)?
-        # TODO quadratic matrix distance from each q to each q multipled by softmaxed similarities using
-        #  in-memory q when possible; otehrwise for convolved state-actions can estimate parametrically
-        #  and can actually do distance (distributional?) between q value distributions over all actions
+        # TODO filter by euclidean distance with MHDPA representations
         logits = logits - torch.max(logits, 1)[0][:, None]
         return logits
 
 
-class EclecticMemCurlSacAgent(object):
-    """Eclectic-Mem adaptation with CURL representation learning with SAC."""
+class CurlSacAgent(object):
+    """CURL representation learning with SAC."""
 
     def __init__(
             self,
             obs_shape,
             action_shape,
             device,
-            memory,
             hidden_dim=256,
             discount=0.99,
             init_temperature=0.01,
@@ -310,7 +262,7 @@ class EclecticMemCurlSacAgent(object):
             cpc_update_freq=1,
             log_interval=100,
             detach_encoder=False,
-            curl_latent_dim=128,
+            curl_latent_dim=128
     ):
         self.device = device
         self.discount = discount
@@ -328,20 +280,18 @@ class EclecticMemCurlSacAgent(object):
         self.actor = Actor(
             obs_shape, action_shape, hidden_dim, encoder_type,
             encoder_feature_dim, actor_log_std_min, actor_log_std_max,
-            num_layers, num_filters, memory
+            num_layers, num_filters
         ).to(device)
 
         self.critic = Critic(
             obs_shape, action_shape, hidden_dim, encoder_type,
-            encoder_feature_dim, num_layers, num_filters, memory
+            encoder_feature_dim, num_layers, num_filters
         ).to(device)
 
         self.critic_target = Critic(
             obs_shape, action_shape, hidden_dim, encoder_type,
-            encoder_feature_dim, num_layers, num_filters, memory
+            encoder_feature_dim, num_layers, num_filters
         ).to(device)
-
-        self.memory = memory
 
         self.critic_target.load_state_dict(self.critic.state_dict())
 
@@ -366,26 +316,26 @@ class EclecticMemCurlSacAgent(object):
             [self.log_alpha], lr=alpha_lr, betas=(alpha_beta, 0.999)
         )
 
-        if self.encoder_type == 'pixel':
-            # create CURL encoder (the 128 batch size is probably unnecessary)
-            self.CURL = CURL(obs_shape, encoder_feature_dim,
-                             self.curl_latent_dim, self.critic, self.critic_target, output_type='continuous').to(
-                self.device)
+        # create CURL encoder (the 128 batch size is probably unnecessary)
+        self.CURL = CURL(obs_shape, encoder_feature_dim,
+                         self.curl_latent_dim, self.critic, self.critic_target, output_type='continuous').to(
+            self.device)
 
-            # optimizer for critic encoder for reconstruction loss
-            self.encoder_optimizer = torch.optim.Adam(
-                self.critic.encoder.parameters(), lr=encoder_lr
-            )
+        # optimizer for critic encoder for reconstruction loss
+        self.encoder_optimizer = torch.optim.Adam(
+            self.critic.encoder.parameters(), lr=encoder_lr
+        )
 
-            self.cpc_optimizer = torch.optim.Adam(
-                self.CURL.parameters(), lr=encoder_lr
-            )
-
-            memory.delta = self.CURL.compute_logits
-
-            # self.em_optimizer = torch.optim.Adam(self.EclecticMem.parameters(), lr=encoder_lr)
+        self.cpc_optimizer = torch.optim.Adam(
+            self.CURL.parameters(), lr=encoder_lr
+        )
         self.cross_entropy_loss = nn.CrossEntropyLoss()
-
+        # ====================== DDP =======================
+        # self.actor = DDP(self.actor, device_ids=[device])
+        # self.critic = DDP(self.critic, device_ids=[device])
+        # self.critic_target = DDP(self.critic_target, device_ids=[device])
+        # self.CURL = DDP(self.CURL, device_ids=[device])
+        # ====================== DDP =======================
         self.train()
         self.critic_target.train()
 
@@ -395,7 +345,6 @@ class EclecticMemCurlSacAgent(object):
         self.critic.train(training)
         if self.encoder_type == 'pixel':
             self.CURL.train(training)
-            # self.EclecticMem.train(training)
 
     @property
     def alpha(self):
@@ -412,7 +361,7 @@ class EclecticMemCurlSacAgent(object):
 
     def sample_action(self, obs):
         if obs.shape[-1] != self.image_size:
-            obs = utils.center_crop_image(obs, self.image_size)
+            obs = curl_utils.center_crop_image(obs, self.image_size)
 
         with torch.no_grad():
             obs = torch.FloatTensor(obs).to(self.device)
@@ -420,44 +369,21 @@ class EclecticMemCurlSacAgent(object):
             mu, pi, _, _ = self.actor(obs, compute_log_pi=False)
             return pi.cpu().data.numpy().flatten()
 
-    def sample_action_with_q_value(self, obs):
-        if obs.shape[-1] != self.image_size:
-            obs = utils.center_crop_image(obs, self.image_size)
-
-        with torch.no_grad():
-            obs = torch.FloatTensor(obs).to(self.device)
-            obs = obs.unsqueeze(0)
-            mu, pi, log_pi, _ = self.actor(obs)
-            q1, q2, q3, c = self.critic_target(obs, pi, return_c=True)
-            q = torch.min(q1, q2) - self.alpha.detach() * log_pi
-            return pi.cpu().data.numpy().flatten(), c, q
-
     def update_critic(self, obs, action, reward, next_obs, not_done, L, step):
         with torch.no_grad():
-            # TODO can compute similarity-weighted past q-values but otherwise output from c, no c_prime
             _, policy_action, log_pi, _ = self.actor(next_obs)
-            # target_Q1, target_Q2, c_next, c_prime_next = self.critic_target(next_obs, policy_action, return_c=True)
-            target_Q1, target_Q2, target_Q3, c_next = self.critic_target(next_obs, policy_action, return_c=True)
-            target_V = torch.min(target_Q1, target_Q2) - self.alpha.detach() * log_pi
+            target_Q1, target_Q2 = self.critic_target(next_obs, policy_action)
+            target_V = torch.min(target_Q1,
+                                 target_Q2) - self.alpha.detach() * log_pi
             target_Q = reward + (not_done * self.discount * target_V)
 
         # get current Q estimates
-        # TODO update c, qs in memory by some weighted average to their new expected q from next_obs/next_c
-        # current_Q1, current_Q2, c, c_prime = self.critic(obs, action, detach_encoder=self.detach_encoder, return_c=True)
-        current_Q1, current_Q2, current_Q3, c = self.critic(obs, action, detach_encoder=self.detach_encoder, return_c=True)
-
-        critic_loss_Q1 = F.mse_loss(current_Q1, target_Q)
-        critic_loss_Q2 = F.mse_loss(current_Q2, target_Q)
-        critic_loss_Q3 = torch.zeros_like(critic_loss_Q1)
-        if current_Q3 is not None:
-            critic_loss_Q3 = F.mse_loss(current_Q3, target_Q)
-        critic_loss = critic_loss_Q1 + critic_loss_Q2 + critic_loss_Q3
-
+        current_Q1, current_Q2 = self.critic(
+            obs, action, detach_encoder=self.detach_encoder)
+        critic_loss = F.mse_loss(current_Q1,
+                                 target_Q) + F.mse_loss(current_Q2, target_Q)
         if step % self.log_interval == 0:
             L.log('train_critic/loss', critic_loss, step)
-            L.log('train_critic/loss_q1', critic_loss_Q1, step)
-            L.log('train_critic/loss_q2', critic_loss_Q2, step)
-            L.log('train_critic/loss_q3', critic_loss_Q3, step)
 
         # Optimize the critic
         self.critic_optimizer.zero_grad()
@@ -467,13 +393,11 @@ class EclecticMemCurlSacAgent(object):
         self.critic.log(L, step)
 
     def update_actor_and_alpha(self, obs, L, step):
-        # detach encoder, so we don't update it with the actor loss TODO should it?
+        # detach encoder, so we don't update it with the actor loss
         _, pi, log_pi, log_std = self.actor(obs, detach_encoder=True)
-        # TODO torch.no_grad? Will q val still overestimate in this case?
-        actor_Q1, actor_Q2, actor_Q3 = self.critic(obs, pi, detach_encoder=True)
+        actor_Q1, actor_Q2 = self.critic(obs, pi, detach_encoder=True)
 
         actor_Q = torch.min(actor_Q1, actor_Q2)
-        # entropy, q value maximization
         actor_loss = (self.alpha.detach() * log_pi - actor_Q).mean()
 
         if step % self.log_interval == 0:
@@ -500,14 +424,28 @@ class EclecticMemCurlSacAgent(object):
         alpha_loss.backward()
         self.log_alpha_optimizer.step()
 
-    def update_cpc(self, obs_anchor, obs_pos, cpc_kwargs, L, step):
+    def update_cpc(self, obs_anchor, obs_pos, action, cpc_kwargs, L, step):
 
         z_a = self.CURL.encode(obs_anchor)
         z_pos = self.CURL.encode(obs_pos, ema=True)
 
-        logits = self.CURL.compute_logits(z_a, z_pos)
+        # TODO easier to just do this https://github.com/denisyarats/drq/blob/master/replay_buffer.py
+        #  if doing this, can compute as part of critic to avoid redundancies,
+        #  although that approach doesn't relate all actions
+        # expand to pair each z_a, a and a_pos, a (z_a, z_pos correspond)
+        # B*B, z_dim + a_dim (both)
+        # compute q val (B*B, 1) -> z_a_q, z_pos_q (minimize mse of these)
+        # reshape B, B (both)
+        # cross L2 (B, B) -> detach -> q_differences
+
+        logits, q_L2, z_a_q, z_pos_q = self.CURL(z_a, z_pos, action, self.critic)
+        q_L2.fill_diagonal_(0)
         labels = torch.arange(logits.shape[0]).long().to(self.device)
-        loss = self.cross_entropy_loss(logits, labels)
+        # TODO do we need the cross entropy? do i need beta, omega in cross entropy?
+        # TODO should softmax be over dim or over all?
+        loss = self.cross_entropy_loss(logits, labels) \
+               + (torch.softmax((logits + self.omega) * self.beta) * q_L2).sum() \
+               + self.mse(z_a_q, z_pos_q)
 
         self.encoder_optimizer.zero_grad()
         self.cpc_optimizer.zero_grad()
@@ -518,9 +456,9 @@ class EclecticMemCurlSacAgent(object):
         if step % self.log_interval == 0:
             L.log('train/curl_loss', loss, step)
 
-    def update(self, replay_buffer, L, step):
+    def update(self, replay_buffer, L, step, device):
         if self.encoder_type == 'pixel':
-            obs, action, reward, next_obs, not_done, cpc_kwargs = replay_buffer.sample_cpc()
+            obs, action, reward, next_obs, not_done, cpc_kwargs = replay_buffer.sample_cpc(device)
         else:
             obs, action, reward, next_obs, not_done = replay_buffer.sample_proprio()
 
@@ -533,20 +471,21 @@ class EclecticMemCurlSacAgent(object):
             self.update_actor_and_alpha(obs, L, step)
 
         if step % self.critic_target_update_freq == 0:
-            utils.soft_update_params(
+            curl_utils.soft_update_params(
                 self.critic.Q1, self.critic_target.Q1, self.critic_tau
             )
-            utils.soft_update_params(
+            curl_utils.soft_update_params(
                 self.critic.Q2, self.critic_target.Q2, self.critic_tau
             )
-            utils.soft_update_params(
+            curl_utils.soft_update_params(
                 self.critic.encoder, self.critic_target.encoder,
                 self.encoder_tau
             )
 
         if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
             obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
-            self.update_cpc(obs_anchor, obs_pos, cpc_kwargs, L, step)
+            # TODO pass in q val
+            self.update_cpc(obs_anchor, obs_pos, action, cpc_kwargs, L, step)
 
     def save(self, model_dir, step):
         torch.save(
@@ -559,11 +498,6 @@ class EclecticMemCurlSacAgent(object):
     def save_curl(self, model_dir, step):
         torch.save(
             self.CURL.state_dict(), '%s/curl_%s.pt' % (model_dir, step)
-        )
-
-    def save_em(self, model_dir, step):
-        torch.save(
-            self.memory.state_dict(), '%s/em_%s.pt' % (model_dir, step)
         )
 
     def load(self, model_dir, step):
