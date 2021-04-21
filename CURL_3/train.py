@@ -261,10 +261,8 @@ def main(rank):
         # sample action for storage collection
         if step < args.init_steps:
             action = env.action_space.sample()
-            print(obs.shape)
         else:
             with curl_utils.eval_mode(agent):
-                print(obs.shape)
                 action = agent.sample_action(obs)
 
         # run training update
