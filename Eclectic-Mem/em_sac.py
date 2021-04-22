@@ -428,8 +428,10 @@ class EclecticMemCurlSacAgent(object):
             obs = torch.FloatTensor(obs).to(self.device)
             obs = obs.unsqueeze(0)
             mu, pi, log_pi, _ = self.actor(obs)
-            q1, q2, q3, c = self.critic_target(obs, pi, return_c=True)
-            q = torch.min(q1, q2) - self.alpha.detach() * log_pi
+            q1, q2, q3, c = self.critic(obs, pi, return_c=True)
+            # TODO should entropy be part of memory q? Should memory just compute q on the fly from traces?
+            # q = torch.min(q1, q2) - self.alpha.detach() * log_pi
+            q = torch.min(q1, q2)
             return pi.cpu().data.numpy().flatten(), c, q
 
     def update_critic(self, obs, action, reward, next_obs, not_done, L, step):

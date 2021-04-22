@@ -369,19 +369,28 @@ class CurlSacAgent(object):
             mu, pi, _, _ = self.actor(obs, compute_log_pi=False)
             return pi.cpu().data.numpy().flatten()
 
-    def update_critic(self, obs, action, reward, next_obs, not_done, L, step):
+    def update_critic(self, obs, action, reward, next_obs, not_done, L, step, cpc_kwargs):
+        obs_aug, next_obs_aug = cpc_kwargs["obs_pos"], cpc_kwargs["next_pos"]
         with torch.no_grad():
             _, policy_action, log_pi, _ = self.actor(next_obs)
             target_Q1, target_Q2 = self.critic_target(next_obs, policy_action)
-            target_V = torch.min(target_Q1,
-                                 target_Q2) - self.alpha.detach() * log_pi
+            target_V = torch.min(target_Q1, target_Q2) - self.alpha.detach() * log_pi
             target_Q = reward + (not_done * self.discount * target_V)
 
+            _, policy_action_aug, log_pi_aug, _ = self.actor(next_obs_aug)
+            target_Q1_aug, target_Q2_aug = self.critic_target(next_obs_aug, policy_action_aug)
+            target_V_aug = torch.min(target_Q1_aug, target_Q2_aug) - self.alpha.detach() * log_pi_aug
+            target_Q_aug = reward + (not_done * self.discount * target_V_aug)
+
+            target_Q = (target_Q + target_Q_aug) / 2
+
         # get current Q estimates
-        current_Q1, current_Q2 = self.critic(
-            obs, action, detach_encoder=self.detach_encoder)
-        critic_loss = F.mse_loss(current_Q1,
-                                 target_Q) + F.mse_loss(current_Q2, target_Q)
+        current_Q1, current_Q2 = self.critic(obs, action, detach_encoder=self.detach_encoder)
+        critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(current_Q2, target_Q)
+
+        Q1_aug, Q2_aug = self.critic(obs_aug, action, detach_encoder=self.detach_encoder)
+        critic_loss += F.mse_loss(Q1_aug, target_Q) + F.mse_loss(Q2_aug, target_Q)
+
         if step % self.log_interval == 0:
             L.log('train_critic/loss', critic_loss, step)
 
@@ -424,7 +433,7 @@ class CurlSacAgent(object):
         alpha_loss.backward()
         self.log_alpha_optimizer.step()
 
-    def update_cpc(self, obs_anchor, obs_pos, action, cpc_kwargs, L, step):
+    def update_cpc(self, obs_anchor, obs_pos, L, step, anchor_q=None, pos_q=None):
 
         z_a = self.CURL.encode(obs_anchor)
         z_pos = self.CURL.encode(obs_pos, ema=True)
@@ -436,7 +445,7 @@ class CurlSacAgent(object):
         # B*B, z_dim + a_dim (both)
         # compute q val (B*B, 1) -> z_a_q, z_pos_q (minimize mse of these)
         # reshape B, B (both)
-        # cross L2 (B, B) -> detach -> q_differences
+        # cross L2 (B, B) -> detach -> q_L2
 
         logits = self.CURL(z_a, z_pos)
 
@@ -450,6 +459,11 @@ class CurlSacAgent(object):
         loss = self.cross_entropy_loss(logits, labels) \
                # + (torch.softmax((logits + self.omega) * self.beta) * q_L2).sum() \
                # + self.mse(z_a_q, z_pos_q)
+
+        # anchor_q = anchor_q.view(logits.shape[0], logits.shape[0])
+        # pos_q = pos_q.view(logits.shape[0], logits.shape[0])
+        # cross_L2 = torch.cdist(anchor_q, pos_q, p=2).detach()
+        # loss = (torch.softmax((logits + self.omega) * self.beta) * cross_L2).sum()
 
         self.encoder_optimizer.zero_grad()
         self.cpc_optimizer.zero_grad()
@@ -469,7 +483,8 @@ class CurlSacAgent(object):
         if step % self.log_interval == 0:
             L.log('train/batch_reward', reward.mean(), step)
 
-        self.update_critic(obs, action, reward, next_obs, not_done, L, step)
+        # anchor_q, pos_q = self.update_critic(obs, action, reward, next_obs, not_done, L, step)
+        self.update_critic(obs, action, reward, next_obs, not_done, L, step, cpc_kwargs)
 
         if step % self.actor_update_freq == 0:
             self.update_actor_and_alpha(obs, L, step)
@@ -486,10 +501,12 @@ class CurlSacAgent(object):
                 self.encoder_tau
             )
 
-        if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
-            obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
-            # TODO pass in q val
-            self.update_cpc(obs_anchor, obs_pos, action, cpc_kwargs, L, step)
+        # if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
+        #     obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
+        #     # TODO pass in q val
+        #     self.update_cpc(obs_anchor, obs_pos, L, step,
+        #                     # z_a_q, z_pos_q
+        #                     )
 
     def save(self, model_dir, step):
         torch.save(

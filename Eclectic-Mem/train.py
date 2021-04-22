@@ -23,6 +23,7 @@ def parse_args():
     parser.add_argument('--domain_name', default='quadruped')
     parser.add_argument('--task_name', default='walk')
     parser.add_argument('--expname', default=None)
+    # TODO get rid of this arg
     parser.add_argument('--pre_transform_image_size', default=84, type=int)
 
     parser.add_argument('--image_size', default=84, type=int)

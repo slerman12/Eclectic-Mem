@@ -136,8 +136,8 @@ class ReplayBuffer(Dataset):
         next_obses = self.next_obses[idxs]
         # pos = obses.copy()
 
-        pos = obses_aug = obses.copy()
-        # next_obses_aug = next_obses.copy()
+        pos = obses.copy()
+        next_pos = next_obses.copy()
 
         # TODO comment out
         # obses = random_crop(obses, self.image_size)
@@ -152,17 +152,17 @@ class ReplayBuffer(Dataset):
         rewards = torch.as_tensor(self.rewards[idxs], device=self.device)
         not_dones = torch.as_tensor(self.not_dones[idxs], device=self.device)
 
-        pos = obses_aug = torch.as_tensor(obses_aug, device=self.device).float()
-        # next_obses_aug = torch.as_tensor(next_obses_aug, device=self.device).float()
+        pos = torch.as_tensor(pos, device=self.device).float()
+        next_pos = torch.as_tensor(next_pos, device=self.device).float()
 
         # pos = torch.as_tensor(pos, device=self.device).float()
 
         # # TODO consider using padding and kornia https://github.com/denisyarats/drq/blob/master/replay_buffer.py
         # (move to init; image_pad = 4)
-        pos = obses_aug = self.aug_trans(obses_aug)
-        # next_obses_aug = self.aug_trans(next_obses_aug)
+        pos = self.aug_trans(pos)
+        next_pos = self.aug_trans(next_pos)
 
-        cpc_kwargs = dict(obs_anchor=obses, obs_pos=pos,
+        cpc_kwargs = dict(obs_anchor=obses, obs_pos=pos, next_pos=next_pos,
                           time_anchor=None, time_pos=None)
 
         return obses, actions, rewards, next_obses, not_dones, cpc_kwargs

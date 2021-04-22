@@ -117,7 +117,11 @@ class EclecticMem(Dataset, Module):
 
         obses = self.obses[idxs]
         next_obses = self.next_obses[idxs]
+
         pos = obses.clone().detach()
+        next_pos = next_obses.clone().detach()
+
+        # Can use random_crop from CURL instead
 
         obses = torch.as_tensor(obses, device=self.device).float()
         next_obses = torch.as_tensor(next_obses, device=self.device).float()
@@ -126,9 +130,12 @@ class EclecticMem(Dataset, Module):
         not_dones = torch.as_tensor(self.not_dones[idxs], device=self.device)
 
         pos = torch.as_tensor(pos, device=self.device).float()
-        pos = self.aug_trans(pos)
+        next_pos = torch.as_tensor(next_pos, device=self.device).float()
 
-        cpc_kwargs = dict(obs_anchor=obses, obs_pos=pos,
+        pos = self.aug_trans(pos)
+        next_pos = self.aug_trans(next_pos)
+
+        cpc_kwargs = dict(obs_anchor=obses, obs_pos=pos, next_pos=next_pos,
                           time_anchor=None, time_pos=None)
 
         return obses, actions, rewards, next_obses, not_dones, cpc_kwargs
