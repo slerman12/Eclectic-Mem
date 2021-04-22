@@ -391,6 +391,12 @@ class CurlSacAgent(object):
         Q1_aug, Q2_aug = self.critic(obs_aug, action, detach_encoder=self.detach_encoder)
         critic_loss += F.mse_loss(Q1_aug, target_Q) + F.mse_loss(Q2_aug, target_Q)
 
+        # TODO mse of each current Q for each obs-action, pos-action pair for each action, return Q's
+        # expand to pair each obs, a and pos, a (z_a, z_pos correspond)
+        # B*B, z_dim + a_dim (both)
+        # compute q val (B*B, 1) -> z_a_q, z_pos_q (minimize mse of these)
+        # should this go in update_cpc?
+
         if step % self.log_interval == 0:
             L.log('train_critic/loss', critic_loss, step)
 
@@ -449,20 +455,18 @@ class CurlSacAgent(object):
 
         logits = self.CURL(z_a, z_pos)
 
-        # logits, q_L2, z_a_q, z_pos_q = self.CURL(z_a, z_pos, action, self.critic)
-        # q_L2.fill_diagonal_(0)
-
         labels = torch.arange(logits.shape[0]).long().to(self.device)
 
         # TODO do we need the cross entropy? do i need beta, omega in cross entropy?
         # TODO should softmax be over dim or over all?
         loss = self.cross_entropy_loss(logits, labels) \
                # + (torch.softmax((logits + self.omega) * self.beta) * q_L2).sum() \
-               # + self.mse(z_a_q, z_pos_q)
+               # + self.mse(anchor_q, pos_q)
 
         # anchor_q = anchor_q.view(logits.shape[0], logits.shape[0])
         # pos_q = pos_q.view(logits.shape[0], logits.shape[0])
         # cross_L2 = torch.cdist(anchor_q, pos_q, p=2).detach()
+        # cross_L2.fill_diagonal_(0)
         # loss = (torch.softmax((logits + self.omega) * self.beta) * cross_L2).sum()
 
         self.encoder_optimizer.zero_grad()

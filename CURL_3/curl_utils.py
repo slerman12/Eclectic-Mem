@@ -157,8 +157,9 @@ class ReplayBuffer(Dataset):
 
         # pos = torch.as_tensor(pos, device=self.device).float()
 
-        # # TODO consider using padding and kornia https://github.com/denisyarats/drq/blob/master/replay_buffer.py
-        # (move to init; image_pad = 4)
+        obses = self.aug_trans(obses)
+        next_obses = self.aug_trans(next_obses)
+
         pos = self.aug_trans(pos)
         next_pos = self.aug_trans(next_pos)
 
