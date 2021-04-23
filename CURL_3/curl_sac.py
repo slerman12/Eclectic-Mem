@@ -393,9 +393,9 @@ class CurlSacAgent(object):
 
         # TODO mse of each current Q for each obs-action, pos-action pair for each action, return Q's
         # expand to pair each obs, a and pos, a (z_a, z_pos correspond)
-        print(obs.shape)
         action_conv = action.unsqueeze(0).expand(obs.shape[0], -1, -1).reshape(obs.shape[0] ** 2, action.shape[1])
-        anchor = obs.unsqueeze(1).expand(-1, obs.shape[0], -1, -1, -1).reshape([action_conv.shape[0]] + obs.shape[1:])
+        anchor = obs.unsqueeze(1).expand(-1, obs.shape[0], -1, -1, -1).reshape(action_conv.shape[0],
+                                                                               obs.shape[1], obs.shape[2], obs.shape[3])
         pos = obs_aug.unsqueeze(1).expand(-1, obs.shape[0], -1, -1, -1).reshape(anchor.shape)
         # compute q for each
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder)
