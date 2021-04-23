@@ -393,8 +393,14 @@ class CurlSacAgent(object):
 
         # TODO mse of each current Q for each obs-action, pos-action pair for each action, return Q's
         # expand to pair each obs, a and pos, a (z_a, z_pos correspond)
-        # B*B, z_dim + a_dim (both)
-        # compute q val (B*B, 1) -> z_a_q, z_pos_q (minimize mse of these)
+        # I think the unsqueeze 0 <--> 1 should be reversed?
+        # action_conv = action.unsqueeze(0).expand(obs.shape[0], 1, 1)
+        # anchor = torch.cat([obs.unsqueeze(1).expand(1, action.shape[0], 1), action_conv], dim=2).view(obs.shape[0] ** 2, obs.shape[1] + action.shape[1])
+        # pos = torch.cat([obs_aug.unsqueeze(1).expand(1, action.shape[0], 1), action_conv], dim=2).view(obs_aug.shape[0] ** 2, obs_aug.shape[1] + action.shape[1])
+        # compute q for each
+        # anchor_q =
+        # pos_q =
+        # critic_loss += F.mse_loss(anchor_q, pos_q)
         # should this go in update_cpc?
 
         if step % self.log_interval == 0:
@@ -407,8 +413,11 @@ class CurlSacAgent(object):
 
         self.critic.log(L, step)
 
+        # return anchor_q, pos_q
+
     def update_actor_and_alpha(self, obs, L, step):
         # detach encoder, so we don't update it with the actor loss
+        # TODO don't detach encoder, instead no grad actor Q
         _, pi, log_pi, log_std = self.actor(obs, detach_encoder=True)
         actor_Q1, actor_Q2 = self.critic(obs, pi, detach_encoder=True)
 
@@ -459,14 +468,16 @@ class CurlSacAgent(object):
 
         # TODO do we need the cross entropy? do i need beta, omega in cross entropy?
         # TODO should softmax be over dim or over all?
-        loss = self.cross_entropy_loss(logits, labels) \
-               # + (torch.softmax((logits + self.omega) * self.beta) * q_L2).sum() \
-               # + self.mse(anchor_q, pos_q)
+        loss = self.cross_entropy_loss(logits, labels)
 
+        # # maybe this loss goes in update_critic
+        # loss = F.mse_loss(anchor_q, pos_q)
         # anchor_q = anchor_q.view(logits.shape[0], logits.shape[0])
         # pos_q = pos_q.view(logits.shape[0], logits.shape[0])
         # cross_L2 = torch.cdist(anchor_q, pos_q, p=2).detach()
+        # # maybe fill with negative value
         # cross_L2.fill_diagonal_(0)
+        # # += if above loss here
         # loss = (torch.softmax((logits + self.omega) * self.beta) * cross_L2).sum()
 
         self.encoder_optimizer.zero_grad()
@@ -505,12 +516,12 @@ class CurlSacAgent(object):
                 self.encoder_tau
             )
 
-        # if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
-        #     obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
-        #     # TODO pass in q val
-        #     self.update_cpc(obs_anchor, obs_pos, L, step,
-        #                     # z_a_q, z_pos_q
-        #                     )
+        if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
+            obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
+            # TODO pass in q val
+            self.update_cpc(obs_anchor, obs_pos, L, step,
+                            # z_a_q, z_pos_q
+                            )
 
     def save(self, model_dir, step):
         torch.save(
