@@ -405,8 +405,8 @@ class CurlSacAgent(object):
         action_dist = action[action_inds]
         action_conv = action_dist.unsqueeze(0).expand(c.shape[0], -1, -1).reshape(c.shape[0] * action_dist.shape[0],
                                                                                   action.shape[1])
-        anchor = obs.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(action_conv.shape[0], c.shape[1])
-        pos = obs_aug.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(anchor.shape)
+        anchor = c.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(action_conv.shape[0], c.shape[1])
+        pos = c_aug.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(anchor.shape)
         # compute q for each
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
         pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
