@@ -393,15 +393,14 @@ class CurlSacAgent(object):
 
         # TODO mse of each current Q for each obs-action, pos-action pair for each action, return Q's
         # expand to pair each obs, a and pos, a (z_a, z_pos correspond)
-        # I think the unsqueeze 0 <--> 1 should be reversed?
-        # action_conv = action.unsqueeze(0).expand(obs.shape[0], 1, 1)
-        # anchor = torch.cat([obs.unsqueeze(1).expand(1, action.shape[0], 1), action_conv], dim=2).view(obs.shape[0] ** 2, obs.shape[1] + action.shape[1])
-        # pos = torch.cat([obs_aug.unsqueeze(1).expand(1, action.shape[0], 1), action_conv], dim=2).view(obs_aug.shape[0] ** 2, obs_aug.shape[1] + action.shape[1])
+        action_conv = action.unsqueeze(0).expand(obs.shape[0], 1, 1).view(action.shape[0] ** 2, action.shape[1])
+        anchor = obs.unsqueeze(1).expand(1, action.shape[0], 1).view(action.shape[0], obs.shape[1])
+        pos = obs_aug.unsqueeze(1).expand(1, action.shape[0], 1).view(anchor.shape)
         # compute q for each
-        # anchor_q =
-        # pos_q =
-        # critic_loss += F.mse_loss(anchor_q, pos_q)
-        # should this go in update_cpc?
+        anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder)
+        pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder)
+        critic_loss += F.mse_loss(anchor_q, pos_q)
+        # TODO should this go in update_cpc?
 
         if step % self.log_interval == 0:
             L.log('train_critic/loss', critic_loss, step)
@@ -413,7 +412,7 @@ class CurlSacAgent(object):
 
         self.critic.log(L, step)
 
-        # return anchor_q, pos_q
+        return anchor_q, pos_q
 
     def update_actor_and_alpha(self, obs, L, step):
         # detach encoder, so we don't update it with the actor loss
