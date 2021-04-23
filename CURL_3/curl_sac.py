@@ -400,7 +400,7 @@ class CurlSacAgent(object):
         # TODO is it possible to instead view after expanding without allocating new memory?
         #  Treating multiple dims as batch dims?
         #  Also, reuse encodings computed above!
-        action_dist_size = 5
+        action_dist_size = 10
         action_inds = np.random.randint(0, c.shape[0], size=action_dist_size)
         action_dist = action[action_inds]
         action_conv = action_dist.unsqueeze(0).expand(c.shape[0], -1, -1).reshape(c.shape[0] * action_dist.shape[0],
