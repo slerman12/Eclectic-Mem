@@ -158,15 +158,17 @@ class Critic(nn.Module):
         self.outputs = dict()
         self.apply(weight_init)
 
-    def forward(self, obs, action, detach_encoder=False):
+    def forward(self, obs, action, detach_encoder=False, obs_already_encoded=False):
         # detach_encoder allows to stop gradient propogation to encoder
-        obs = self.encoder(obs, detach=detach_encoder)
+        if not obs_already_encoded:
+            obs = self.encoder(obs, detach=detach_encoder)
 
         q1 = self.Q1(obs, action)
         q2 = self.Q2(obs, action)
 
         self.outputs['q1'] = q1
         self.outputs['q2'] = q2
+        self.outputs['c'] = obs
 
         return q1, q2
 
@@ -387,27 +389,28 @@ class CurlSacAgent(object):
         # get current Q estimates
         current_Q1, current_Q2 = self.critic(obs, action, detach_encoder=self.detach_encoder)
         critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(current_Q2, target_Q)
+        c = self.critic.outputs['c']
 
         Q1_aug, Q2_aug = self.critic(obs_aug, action, detach_encoder=self.detach_encoder)
         critic_loss += F.mse_loss(Q1_aug, target_Q) + F.mse_loss(Q2_aug, target_Q)
+        c_aug = self.critic.outputs['c']
 
         # TODO mse of each current Q for each obs-action, pos-action pair for each action, return Q's
         # expand to pair each obs, a and pos, a (z_a, z_pos correspond)
         # TODO is it possible to instead view after expanding without allocating new memory?
         #  Treating multiple dims as batch dims?
+        #  Also, reuse encodings computed above!
         action_dist_size = 5
-        action_inds = np.random.randint(0, obs.shape[0], size=action_dist_size)
+        action_inds = np.random.randint(0, c.shape[0], size=action_dist_size)
         action_dist = action[action_inds]
-        action_conv = action_dist.unsqueeze(0).expand(obs.shape[0], -1, -1).reshape(obs.shape[0] * action_dist.shape[0],
-                                                                                    action.shape[1])
-        anchor = obs.unsqueeze(1).expand(-1, action_dist.shape[0], -1, -1, -1).reshape(action_conv.shape[0],
-                                                                                       obs.shape[1], obs.shape[2], obs.shape[3])
-        pos = obs_aug.unsqueeze(1).expand(-1, action_dist.shape[0], -1, -1, -1).reshape(anchor.shape)
+        action_conv = action_dist.unsqueeze(0).expand(c.shape[0], -1, -1).reshape(c.shape[0] * action_dist.shape[0],
+                                                                                  action.shape[1])
+        anchor = obs.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(action_conv.shape[0], c.shape[1])
+        pos = obs_aug.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(anchor.shape)
         # compute q for each
-        anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder)
-        pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder)
-        critic_loss += F.mse_loss(anchor_q[0], pos_q[0])
-        critic_loss += F.mse_loss(anchor_q[1], pos_q[1])
+        anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
+        pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
+        critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
         # TODO should this go in update_cpc?
 
         if step % self.log_interval == 0:
