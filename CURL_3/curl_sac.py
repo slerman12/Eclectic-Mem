@@ -395,7 +395,7 @@ class CurlSacAgent(object):
         # expand to pair each obs, a and pos, a (z_a, z_pos correspond)
         # TODO is it possible to instead view after expanding without allocating new memory?
         #  Treating multiple dims as batch dims?
-        action_dist_size = 10
+        action_dist_size = 5
         action_inds = np.random.randint(0, obs.shape[0], size=action_dist_size)
         action_dist = action[action_inds]
         action_conv = action_dist.unsqueeze(0).expand(obs.shape[0], -1, -1).reshape(obs.shape[0] * action_dist.shape[0],
