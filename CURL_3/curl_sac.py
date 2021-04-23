@@ -398,11 +398,11 @@ class CurlSacAgent(object):
         action_dist_size = 10
         action_inds = np.random.randint(0, obs.shape[0], size=action_dist_size)
         action_dist = action[action_inds]
-        action_conv = action_dist.unsqueeze(0).expand(obs.shape[0], -1, -1).view(obs.shape[0] * action_dist.shape[0],
+        action_conv = action_dist.unsqueeze(0).expand(obs.shape[0], -1, -1).reshape(obs.shape[0] * action_dist.shape[0],
                                                                                  action.shape[1])
-        anchor = obs.unsqueeze(1).expand(-1, action_dist.shape[0], -1, -1, -1).view(action_conv.shape[0],
+        anchor = obs.unsqueeze(1).expand(-1, action_dist.shape[0], -1, -1, -1).reshape(action_conv.shape[0],
                                                                             obs.shape[1], obs.shape[2], obs.shape[3])
-        pos = obs_aug.unsqueeze(1).expand(-1, action_dist.shape[0], -1, -1, -1).view(anchor.shape)
+        pos = obs_aug.unsqueeze(1).expand(-1, action_dist.shape[0], -1, -1, -1).reshape(anchor.shape)
         # compute q for each
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder)
         pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder)
