@@ -391,8 +391,12 @@ class CurlSacAgent(object):
         critic_loss = F.mse_loss(current_Q1, target_Q) + F.mse_loss(current_Q2, target_Q)
         c = self.critic.outputs['c']
 
+        # TODO should this be encoded with ema=True? (critic_target and no_grad)
+        # with torch.no_grad():
+        #     Q1_aug, Q2_aug = self.critic_target(obs_aug, action, detach_encoder=self.detach_encoder)
         Q1_aug, Q2_aug = self.critic(obs_aug, action, detach_encoder=self.detach_encoder)
         critic_loss += F.mse_loss(Q1_aug, target_Q) + F.mse_loss(Q2_aug, target_Q)
+        # TODO ema?
         c_aug = self.critic.outputs['c']
 
         # TODO mse of each current Q for each obs-action, pos-action pair for each action, return Q's
@@ -400,17 +404,17 @@ class CurlSacAgent(object):
         # TODO is it possible to instead view after expanding without allocating new memory?
         #  Treating multiple dims as batch dims?
         #  Also, reuse encodings computed above!
-        action_dist_size = 10
-        action_inds = np.random.randint(0, c.shape[0], size=action_dist_size)
-        action_dist = action[action_inds]
-        action_conv = action_dist.unsqueeze(0).expand(c.shape[0], -1, -1).reshape(c.shape[0] * action_dist.shape[0],
-                                                                                  action.shape[1])
-        anchor = c.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(action_conv.shape[0], c.shape[1])
-        pos = c_aug.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(anchor.shape)
-        # compute q for each
-        anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
-        pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
-        critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
+        # action_dist_size = 10
+        # action_inds = np.random.randint(0, c.shape[0], size=action_dist_size)
+        # action_dist = action[action_inds]
+        # action_conv = action_dist.unsqueeze(0).expand(c.shape[0], -1, -1).reshape(c.shape[0] * action_dist.shape[0],
+        #                                                                           action.shape[1])
+        # anchor = c.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(action_conv.shape[0], c.shape[1])
+        # pos = c_aug.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(anchor.shape)
+        # # compute q for each
+        # anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
+        # pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
+        # critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
         # TODO should this go in update_cpc?
 
         if step % self.log_interval == 0:
@@ -423,7 +427,7 @@ class CurlSacAgent(object):
 
         self.critic.log(L, step)
 
-        return anchor_q, pos_q
+        # return anchor_q, pos_q
 
     def update_actor_and_alpha(self, obs, L, step):
         # detach encoder, so we don't update it with the actor loss
@@ -465,7 +469,8 @@ class CurlSacAgent(object):
     def update_cpc(self, obs_anchor, obs_pos, L, step, anchor_q=None, pos_q=None):
 
         z_a = self.CURL.encode(obs_anchor)
-        z_pos = self.CURL.encode(obs_pos, ema=True)
+        # TODO use ema?
+        z_pos = self.CURL.encode(obs_pos, ema=False)
 
         # TODO easier to just do this https://github.com/denisyarats/drq/blob/master/replay_buffer.py
         #  if doing this, can compute as part of critic to avoid redundancies,
@@ -485,6 +490,7 @@ class CurlSacAgent(object):
         loss = self.cross_entropy_loss(logits, labels)
 
         # # maybe this loss goes in update_critic
+        # TODO Note: right now anchor_q, pos_q are tuples themselves with Q1 and Q2
         # loss = F.mse_loss(anchor_q, pos_q)
         # anchor_q = anchor_q.view(logits.shape[0], logits.shape[0])
         # pos_q = pos_q.view(logits.shape[0], logits.shape[0])
@@ -512,7 +518,7 @@ class CurlSacAgent(object):
         if step % self.log_interval == 0:
             L.log('train/batch_reward', reward.mean(), step)
 
-        # anchor_q, pos_q = self.update_critic(obs, action, reward, next_obs, not_done, L, step)
+        # anchor_q, pos_q = self.update_critic(obs, action, reward, next_obs, not_done, L, step, cpc_kwargs)
         self.update_critic(obs, action, reward, next_obs, not_done, L, step, cpc_kwargs)
 
         if step % self.actor_update_freq == 0:
@@ -534,7 +540,7 @@ class CurlSacAgent(object):
             obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
             # TODO pass in q val
             self.update_cpc(obs_anchor, obs_pos, L, step,
-                            # z_a_q, z_pos_q
+                            # anchor_q, pos_q
                             )
 
     def save(self, model_dir, step):
