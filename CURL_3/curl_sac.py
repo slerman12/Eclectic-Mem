@@ -393,13 +393,16 @@ class CurlSacAgent(object):
 
         # TODO mse of each current Q for each obs-action, pos-action pair for each action, return Q's
         # expand to pair each obs, a and pos, a (z_a, z_pos correspond)
-        # action_conv = action.unsqueeze(0).expand(obs.shape[0], -1, -1).view(obs.shape[0] ** 2, action.shape[1])
-        # anchor = obs.unsqueeze(1).expand(-1, obs.shape[0], -1, -1, -1).view(action_conv.shape[0],
-        #                                                                     obs.shape[1], obs.shape[2], obs.shape[3])
-        # pos = obs_aug.unsqueeze(1).expand(-1, obs.shape[0], -1, -1, -1).view(anchor.shape)
-        action_conv = action.unsqueeze(0).expand(obs.shape[0], -1, -1)
-        anchor = obs.unsqueeze(1).expand(-1, obs.shape[0], -1, -1, -1)
-        pos = obs_aug.unsqueeze(1).expand(-1, obs.shape[0], -1, -1, -1)
+        # TODO is it possible to instead view after expanding without allocating new memory?
+        #  Treating multiple dims as batch dims?
+        action_dist_size = 10
+        action_inds = np.random.randint(0, obs.shape[0], size=action_dist_size)
+        action_dist = action[action_inds]
+        action_conv = action_dist.unsqueeze(0).expand(obs.shape[0], -1, -1).view(obs.shape[0] * action_dist.shape[0],
+                                                                                 action.shape[1])
+        anchor = obs.unsqueeze(1).expand(-1, action_dist.shape[0], -1, -1, -1).view(action_conv.shape[0],
+                                                                            obs.shape[1], obs.shape[2], obs.shape[3])
+        pos = obs_aug.unsqueeze(1).expand(-1, action_dist.shape[0], -1, -1, -1).view(anchor.shape)
         # compute q for each
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder)
         pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder)
