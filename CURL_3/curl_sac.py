@@ -394,12 +394,12 @@ class CurlSacAgent(object):
         # TODO mse of each current Q for each obs-action, pos-action pair for each action, return Q's
         # expand to pair each obs, a and pos, a (z_a, z_pos correspond)
         action_conv = action.unsqueeze(0).expand(action.shape[0], -1, -1).reshape(action.shape[0] ** 2, action.shape[1])
-        anchor = obs.unsqueeze(1).expand(-1, action.shape[0], -1).reshape(action_conv.shape[0], obs.shape[1])
-        pos = obs_aug.unsqueeze(1).expand(-1, action.shape[0], -1).reshape(anchor.shape)
+        anc = obs.unsqueeze(1).expand(-1, action.shape[0], -1, -1, -1).reshape([action_conv.shape[0]] + obs.shape[1:])
+        pos = obs_aug.unsqueeze(1).expand(-1, action.shape[0], -1, -1, -1).reshape(anc.shape)
         # compute q for each
-        anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder)
+        anc_q = self.critic(anc, action_conv, detach_encoder=self.detach_encoder)
         pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder)
-        critic_loss += F.mse_loss(anchor_q, pos_q)
+        critic_loss += F.mse_loss(anc_q, pos_q)
         # TODO should this go in update_cpc?
 
         if step % self.log_interval == 0:
@@ -412,7 +412,7 @@ class CurlSacAgent(object):
 
         self.critic.log(L, step)
 
-        return anchor_q, pos_q
+        return anc_q, pos_q
 
     def update_actor_and_alpha(self, obs, L, step):
         # detach encoder, so we don't update it with the actor loss
