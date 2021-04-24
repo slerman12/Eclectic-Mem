@@ -446,15 +446,6 @@ class CurlSacAgent(object):
         _, pi, log_pi, log_std = self.actor(obs, detach_encoder=True)
         actor_Q1, actor_Q2 = self.critic(obs, pi, detach_encoder=True)
 
-        # TODO don't detach encoder, instead no grad actor Q... except need grads to still flow to pi
-        # _, pi, log_pi, log_std = self.actor(obs, detach_encoder=False)
-        print(self.critic.parameters())
-        # for param in self.critic.parameters():
-        #     # TODO can speed this up; also does this work or need to iterate through encoder and conv layers?
-        #     if param not in self.actor.parameters():
-        #         param.requires_grad = False
-        # actor_Q1, actor_Q2 = self.critic(obs, pi, detach_encoder=False)
-
         actor_Q = torch.min(actor_Q1, actor_Q2)
         actor_loss = (self.alpha.detach() * log_pi - actor_Q).mean()
 
@@ -482,9 +473,6 @@ class CurlSacAgent(object):
             L.log('train_alpha/value', self.alpha, step)
         alpha_loss.backward()
         self.log_alpha_optimizer.step()
-
-        # for param in self.critic.parameters():
-        #     param.requires_grad = True
 
     def update_cpc(self, obs_anchor, obs_pos, L, step, anchor_q=None, pos_q=None):
 
