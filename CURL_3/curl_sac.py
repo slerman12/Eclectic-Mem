@@ -389,6 +389,10 @@ class CurlSacAgent(object):
             target_V_aug = torch.min(target_Q1_aug, target_Q2_aug) - self.alpha.detach() * log_pi_aug
             target_Q_aug = reward + (not_done * self.discount * target_V_aug)
 
+            disable_dqr = False
+            if disable_dqr:
+                target_Q_aug = target_Q
+
             target_Q = (target_Q + target_Q_aug) / 2
 
         # get current Q estimates
@@ -400,7 +404,8 @@ class CurlSacAgent(object):
         # with torch.no_grad():
         #     Q1_aug, Q2_aug = self.critic_target(obs_aug, action, detach_encoder=self.detach_encoder)
         Q1_aug, Q2_aug = self.critic(obs_aug, action, detach_encoder=self.detach_encoder)
-        critic_loss += F.mse_loss(Q1_aug, target_Q) + F.mse_loss(Q2_aug, target_Q)
+        if not disable_dqr:
+            critic_loss += F.mse_loss(Q1_aug, target_Q) + F.mse_loss(Q2_aug, target_Q)
         # TODO ema?
         c_aug = self.critic.outputs['c']
 
@@ -420,6 +425,7 @@ class CurlSacAgent(object):
         # compute q for each
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
         pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
+        # TODO should this employ torch.min?
         # critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
         # TODO should this go in update_cpc?
 
@@ -442,8 +448,12 @@ class CurlSacAgent(object):
 
         # TODO don't detach encoder, instead no grad actor Q... except need grads to still flow to pi
         # _, pi, log_pi, log_std = self.actor(obs, detach_encoder=False)
-        # with torch.no_grad():
-        #     actor_Q1, actor_Q2 = self.critic(obs, pi, detach_encoder=False)
+        print(self.critic.parameters())
+        # for param in self.critic.parameters():
+        #     # TODO can speed this up; also does this work or need to iterate through encoder and conv layers?
+        #     if param not in self.actor.parameters():
+        #         param.requires_grad = False
+        # actor_Q1, actor_Q2 = self.critic(obs, pi, detach_encoder=False)
 
         actor_Q = torch.min(actor_Q1, actor_Q2)
         actor_loss = (self.alpha.detach() * log_pi - actor_Q).mean()
@@ -457,6 +467,7 @@ class CurlSacAgent(object):
             L.log('train_actor/entropy', entropy.mean(), step)
 
         # optimize the actor
+        # TODO does this already restrict update to just actor params? Then why detach encoder?
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
@@ -471,6 +482,9 @@ class CurlSacAgent(object):
             L.log('train_alpha/value', self.alpha, step)
         alpha_loss.backward()
         self.log_alpha_optimizer.step()
+
+        # for param in self.critic.parameters():
+        #     param.requires_grad = True
 
     def update_cpc(self, obs_anchor, obs_pos, L, step, anchor_q=None, pos_q=None):
 
@@ -503,10 +517,17 @@ class CurlSacAgent(object):
         anchor_q = anchor_q.view(logits.shape[0], logits.shape[0])
         pos_q = pos_q.view(logits.shape[0], logits.shape[0])
         cross_L2 = torch.cdist(anchor_q, pos_q, p=2).detach()
-        # maybe fill with negative value
+        # # maybe fill with negative value
         cross_L2.fill_diagonal_(0)
-        # += if above loss here
-        loss = (F.softmax((logits + self.omega) * self.beta) * cross_L2).sum()
+        # # += if above loss here
+        # loss = (F.softmax((logits + self.omega) * self.beta) * cross_L2).sum()
+        # # TODO try without beta, omega since trivial solution to only prioritize one of the diag elements, not all
+        # loss = (F.softmax(logits) * cross_L2).sum()
+        # TODO or
+        cross_L2 += 1
+        labels = torch.arange(logits.shape[0]).long().to(self.device)
+        # TODO are the logits sigmoided, exponentiated? Does multiplying logits +/- probas, thereby -/+ log(1 - probas)?
+        loss = self.cross_entropy_loss(logits / cross_L2, labels)
 
         self.encoder_optimizer.zero_grad()
         self.cpc_optimizer.zero_grad()
@@ -544,12 +565,12 @@ class CurlSacAgent(object):
                 self.encoder_tau
             )
 
-        if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
-            obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
-            # TODO pass in q val
-            self.update_cpc(obs_anchor, obs_pos, L, step,
-                            anchor_q, pos_q
-                            )
+        # if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
+        #     obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
+        #     # TODO pass in q val
+        #     self.update_cpc(obs_anchor, obs_pos, L, step,
+        #                     anchor_q, pos_q
+        #                     )
 
     def save(self, model_dir, step):
         torch.save(
