@@ -305,9 +305,9 @@ class CurlSacAgent(object):
         # set target entropy to -|A|
         self.target_entropy = -np.prod(action_shape)
 
-        self.beta = torch.tensor(1).to(device)
+        self.beta = torch.tensor(1.0).to(device)
         self.beta.requires_grad = True
-        self.omega = torch.tensor(0).to(device)
+        self.omega = torch.tensor(0.0).to(device)
         self.omega.requires_grad = True
 
         # optimizers
