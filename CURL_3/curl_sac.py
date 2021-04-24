@@ -305,6 +305,11 @@ class CurlSacAgent(object):
         # set target entropy to -|A|
         self.target_entropy = -np.prod(action_shape)
 
+        self.beta = torch.tensor(1).to(device)
+        self.beta.requires_grad = True
+        self.omega = torch.tensor(0).to(device)
+        self.omega.requires_grad = True
+
         # optimizers
         self.actor_optimizer = torch.optim.Adam(
             self.actor.parameters(), lr=actor_lr, betas=(actor_beta, 0.999)
@@ -415,7 +420,7 @@ class CurlSacAgent(object):
         # compute q for each
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
         pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
-        critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
+        # critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
         # TODO should this go in update_cpc?
 
         if step % self.log_interval == 0:
@@ -428,7 +433,7 @@ class CurlSacAgent(object):
 
         self.critic.log(L, step)
 
-        return anchor_q, pos_q
+        return torch.min(*anchor_q), torch.min(*pos_q)
 
     def update_actor_and_alpha(self, obs, L, step):
         # detach encoder, so we don't update it with the actor loss
@@ -484,22 +489,24 @@ class CurlSacAgent(object):
 
         logits = self.CURL(z_a, z_pos)
 
-        labels = torch.arange(logits.shape[0]).long().to(self.device)
+        # labels = torch.arange(logits.shape[0]).long().to(self.device)
 
         # TODO do we need the cross entropy? do i need beta, omega in cross entropy?
         # TODO should softmax be over dim or over all?
-        loss = self.cross_entropy_loss(logits, labels)
+        # loss = self.cross_entropy_loss(logits, labels)
 
         # # maybe this loss goes in update_critic
-        # TODO Note: right now anchor_q, pos_q are tuples themselves with Q1 and Q2
+        # TODO Note: right now anchor_q, pos_q are tuples themselves with Q1 and Q2 (edit: changed)
+        # anchor_q = torch.min(anchor_q)
+        # pos_q = torch.min(pos_q)
         # loss = F.mse_loss(anchor_q, pos_q)
-        # anchor_q = anchor_q.view(logits.shape[0], logits.shape[0])
-        # pos_q = pos_q.view(logits.shape[0], logits.shape[0])
-        # cross_L2 = torch.cdist(anchor_q, pos_q, p=2).detach()
-        # # maybe fill with negative value
-        # cross_L2.fill_diagonal_(0)
-        # # += if above loss here
-        # loss = (torch.softmax((logits + self.omega) * self.beta) * cross_L2).sum()
+        anchor_q = anchor_q.view(logits.shape[0], logits.shape[0])
+        pos_q = pos_q.view(logits.shape[0], logits.shape[0])
+        cross_L2 = torch.cdist(anchor_q, pos_q, p=2).detach()
+        # maybe fill with negative value
+        cross_L2.fill_diagonal_(0)
+        # += if above loss here
+        loss = (F.softmax((logits + self.omega) * self.beta) * cross_L2).sum()
 
         self.encoder_optimizer.zero_grad()
         self.cpc_optimizer.zero_grad()
