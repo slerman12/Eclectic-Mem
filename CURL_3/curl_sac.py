@@ -389,7 +389,7 @@ class CurlSacAgent(object):
             target_V_aug = torch.min(target_Q1_aug, target_Q2_aug) - self.alpha.detach() * log_pi_aug
             target_Q_aug = reward + (not_done * self.discount * target_V_aug)
 
-            disable_dqr = False
+            disable_dqr = True
             if disable_dqr:
                 target_Q_aug = target_Q
 
@@ -553,12 +553,12 @@ class CurlSacAgent(object):
                 self.encoder_tau
             )
 
-        # if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
-        #     obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
-        #     # TODO pass in q val
-        #     self.update_cpc(obs_anchor, obs_pos, L, step,
-        #                     anchor_q, pos_q
-        #                     )
+        if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
+            obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
+            # TODO pass in q val
+            self.update_cpc(obs_anchor, obs_pos, L, step,
+                            anchor_q, pos_q
+                            )
 
     def save(self, model_dir, step):
         torch.save(
