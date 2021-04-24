@@ -515,7 +515,22 @@ class CurlSacAgent(object):
         cross_L2 += 1
         labels = torch.arange(logits.shape[0]).long().to(self.device)
         # TODO are the logits sigmoided, exponentiated? Does multiplying logits +/- probas, thereby -/+ log(1 - probas)?
-        loss = self.cross_entropy_loss(logits / cross_L2, labels)
+        # TODO multiply?
+        loss = self.cross_entropy_loss(logits * cross_L2, labels)
+        # TODO or
+        # cross_L2 = 1 - cross_L2 / cross_L2.max()
+        # loss = F.mse_loss(cross_L2, torch.exp(logits))
+        # TODO KL divergence? - won't work since not distribution (logits don't sum to 1)
+        # self.kl_loss = torch.nn.KLDivLoss(size_average=None, reduce=None, reduction='mean', log_target=False)
+        # cross_L2 = 1 - cross_L2 / cross_L2.max()
+        # loss = self.kl_loss(logits, cross_L2)
+        # TODO maybe softmax or better norm and flatten both
+        # cross_L2 = cross_L2.max() - cross_L2 / cross_L2.max()
+        # loss = self.kl_loss(logits, cross_L2)
+        # TODO soft cross entropy - nope, still won't work since not distribution (logits don't sum to 1)?
+        # cross_L2 = 1 - cross_L2 / cross_L2.max()
+        # logprobs = F.log_softmax(logits, dim=1)
+        # loss = -(cross_L2 * logprobs).sum() / logits.shape[0]
 
         self.encoder_optimizer.zero_grad()
         self.cpc_optimizer.zero_grad()
