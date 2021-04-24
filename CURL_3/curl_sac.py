@@ -404,7 +404,8 @@ class CurlSacAgent(object):
         # TODO is it possible to instead view after expanding without allocating new memory?
         #  Treating multiple dims as batch dims?
         #  Also, reuse encodings computed above!
-        action_dist_size = 10
+        # Can set below batch size to increase backwards pass efficiency
+        action_dist_size = c.shape[0]
         action_inds = np.random.randint(0, c.shape[0], size=action_dist_size)
         action_dist = action[action_inds]
         action_conv = action_dist.unsqueeze(0).expand(c.shape[0], -1, -1).reshape(c.shape[0] * action_dist.shape[0],
@@ -536,12 +537,12 @@ class CurlSacAgent(object):
                 self.encoder_tau
             )
 
-        if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
-            obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
-            # TODO pass in q val
-            self.update_cpc(obs_anchor, obs_pos, L, step,
-                            anchor_q, pos_q
-                            )
+        # if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
+        #     obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
+        #     # TODO pass in q val
+        #     self.update_cpc(obs_anchor, obs_pos, L, step,
+        #                     anchor_q, pos_q
+        #                     )
 
     def save(self, model_dir, step):
         torch.save(
