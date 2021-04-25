@@ -515,7 +515,7 @@ class CurlSacAgent(object):
         labels = torch.arange(logits.shape[0]).long().to(self.device)
         # TODO are the logits sigmoided, exponentiated? Does multiplying logits +/- probas, thereby -/+ log(1 - probas)?
         # TODO multiply?
-        loss = self.cross_entropy_loss(logits * (cross_L2 + 1), labels)
+        loss = self.cross_entropy_loss(logits / (cross_L2), labels)
         # TODO or
         # cross_L2 = 1 - cross_L2 / cross_L2.max()
         # loss = F.mse_loss(cross_L2, torch.exp(logits))
