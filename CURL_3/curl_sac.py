@@ -512,13 +512,13 @@ class CurlSacAgent(object):
         # # TODO try without beta, omega since trivial solution to only prioritize one of the diag elements, not all
         # loss = (F.softmax(logits) * cross_L2).sum()
         # TODO or
-        labels = torch.arange(logits.shape[0]).long().to(self.device)
+        # labels = torch.arange(logits.shape[0]).long().to(self.device)
         # TODO are the logits sigmoided, exponentiated? Does multiplying logits +/- probas, thereby -/+ log(1 - probas)?
         # TODO multiply?
-        loss = self.cross_entropy_loss(logits * (cross_L2 + 1), labels)
+        # loss = self.cross_entropy_loss(logits * (cross_L2 + 1), labels)
         # TODO or
-        # cross_L2 = 1 - cross_L2 / cross_L2.max()
-        # loss = F.mse_loss(cross_L2, torch.exp(logits))
+        cross_L2 = 1 - cross_L2 / cross_L2.max()
+        loss = F.mse_loss(cross_L2, torch.exp(logits))
         # TODO KL divergence? - won't work since not distribution (logits don't sum to 1)
         # self.kl_loss = torch.nn.KLDivLoss(size_average=None, reduce=None, reduction='mean', log_target=False)
         # cross_L2 = 1 - cross_L2 / cross_L2.max()
