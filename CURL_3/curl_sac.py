@@ -384,12 +384,12 @@ class CurlSacAgent(object):
             target_V = torch.min(target_Q1, target_Q2) - self.alpha.detach() * log_pi
             target_Q = reward + (not_done * self.discount * target_V)
 
-            # _, policy_action_aug, log_pi_aug, _ = self.actor(next_obs_aug)
-            # target_Q1_aug, target_Q2_aug = self.critic_target(next_obs_aug, policy_action_aug)
-            # target_V_aug = torch.min(target_Q1_aug, target_Q2_aug) - self.alpha.detach() * log_pi_aug
-            # target_Q_aug = reward + (not_done * self.discount * target_V_aug)
+            _, policy_action_aug, log_pi_aug, _ = self.actor(next_obs_aug)
+            target_Q1_aug, target_Q2_aug = self.critic_target(next_obs_aug, policy_action_aug)
+            target_V_aug = torch.min(target_Q1_aug, target_Q2_aug) - self.alpha.detach() * log_pi_aug
+            target_Q_aug = reward + (not_done * self.discount * target_V_aug)
 
-            disable_dqr = True
+            disable_dqr = False
             if disable_dqr:
                 target_Q_aug = target_Q
 
@@ -404,8 +404,8 @@ class CurlSacAgent(object):
         # with torch.no_grad():
         #     Q1_aug, Q2_aug = self.critic_target(obs_aug, action, detach_encoder=self.detach_encoder)
         Q1_aug, Q2_aug = self.critic(obs_aug, action, detach_encoder=self.detach_encoder)
-        # if not disable_dqr:
-        #     critic_loss += F.mse_loss(Q1_aug, target_Q) + F.mse_loss(Q2_aug, target_Q)
+        if not disable_dqr:
+            critic_loss += F.mse_loss(Q1_aug, target_Q) + F.mse_loss(Q2_aug, target_Q)
         # TODO ema?
         c_aug = self.critic.outputs['c']
 
