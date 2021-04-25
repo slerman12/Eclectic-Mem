@@ -510,7 +510,7 @@ class CurlSacAgent(object):
         # # += if above loss here
         # loss = (F.softmax((logits + self.omega) * self.beta) * cross_L2).sum()
         # # TODO try without beta, omega since trivial solution to only prioritize one of the diag elements, not all
-        loss = (F.softmax(logits.flatten()) * cross_L2.flatten()).sum() \
+        loss = (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).sum() \
                # - torch.log(torch.diagonal(logits)).sum()
         # TODO or
         # labels = torch.arange(logits.shape[0]).long().to(self.device)
