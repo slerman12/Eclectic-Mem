@@ -227,16 +227,17 @@ class CURL(nn.Module):
         - to compute loss use multiclass cross entropy with identity matrix for labels
         """
         Wz = torch.matmul(self.W, z_pos.T)  # (z_dim,B)
-        # logits = torch.matmul(z_a, Wz)  # (B,B)
+        logits = torch.matmul(z_a, Wz)  # (B,B)
 
-        # logits = logits - torch.max(logits, 1)[0][:, None]
+        logits = logits - torch.max(logits, 1)[0][:, None]
 
-        # euclidean distance like NEC
-        z_a = torch.matmul(z_a, self.W)
-        z_pos = torch.matmul(z_pos, self.W)
-        # TODO dim?
-        logits = -torch.cdist(z_a, z_pos, p=2)
-        # TODO filter by euclidean distance with MHDPA representations
+        # # euclidean distance like NEC
+        # z_a = torch.matmul(z_a, self.W)
+        # z_pos = torch.matmul(z_pos, self.W)
+        # # TODO dim?
+        # logits = -torch.cdist(z_a, z_pos, p=2)
+        # # TODO filter by euclidean distance with MHDPA representations
+
         return logits
 
 
@@ -396,7 +397,7 @@ class CurlSacAgent(object):
             target_V_aug = torch.min(target_Q1_aug, target_Q2_aug) - self.alpha.detach() * log_pi_aug
             target_Q_aug = reward + (not_done * self.discount * target_V_aug)
 
-            disable_dqr = True
+            disable_dqr = False
             if disable_dqr:
                 target_Q_aug = target_Q
 
@@ -433,7 +434,7 @@ class CurlSacAgent(object):
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
         pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
         # TODO should this employ torch.min?
-        # critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
+        critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
         # TODO should this go in update_cpc?
 
         if step % self.log_interval == 0:
