@@ -397,7 +397,7 @@ class CurlSacAgent(object):
             target_V_aug = torch.min(target_Q1_aug, target_Q2_aug) - self.alpha.detach() * log_pi_aug
             target_Q_aug = reward + (not_done * self.discount * target_V_aug)
 
-            disable_dqr = False
+            disable_dqr = True
             if disable_dqr:
                 target_Q_aug = target_Q
 
@@ -434,7 +434,7 @@ class CurlSacAgent(object):
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
         pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
         # TODO should this employ torch.min?
-        critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
+        # critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
         # TODO should this go in update_cpc?
 
         if step % self.log_interval == 0:
@@ -499,11 +499,11 @@ class CurlSacAgent(object):
 
         logits = self.CURL(z_a, z_pos)
 
-        # labels = torch.arange(logits.shape[0]).long().to(self.device)
+        labels = torch.arange(logits.shape[0]).long().to(self.device)
 
         # TODO do we need the cross entropy? do i need beta, omega in cross entropy?
         # TODO should softmax be over dim or over all?
-        # loss = self.cross_entropy_loss(logits, labels)
+        loss = self.cross_entropy_loss(logits, labels)
 
         # # maybe this loss goes in update_critic
         # TODO Note: right now anchor_q, pos_q are tuples themselves with Q1 and Q2 (edit: changed)
@@ -520,7 +520,8 @@ class CurlSacAgent(object):
         # # TODO try without beta, omega since trivial solution to only prioritize one of the diag elements, not all
         # loss = (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).mean() \
         #        - torch.log(torch.diagonal(logits)).mean()
-        loss = (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).sum()
+        # loss = (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).sum()
+        loss += (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).sum()
 
         # TODO mean?
         # TODO or
