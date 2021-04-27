@@ -434,7 +434,7 @@ class CurlSacAgent(object):
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
         pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
         # TODO should this employ torch.min?
-        # critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
+        critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
         # TODO should this go in update_cpc?
 
         if step % self.log_interval == 0:
@@ -582,12 +582,12 @@ class CurlSacAgent(object):
                 self.encoder_tau
             )
 
-        if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
-            obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
-            # TODO pass in q val
-            self.update_cpc(obs_anchor, obs_pos, L, step,
-                            anchor_q, pos_q
-                            )
+        # if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
+        #     obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
+        #     # TODO pass in q val
+        #     self.update_cpc(obs_anchor, obs_pos, L, step,
+        #                     anchor_q, pos_q
+        #                     )
 
     def save(self, model_dir, step):
         torch.save(
