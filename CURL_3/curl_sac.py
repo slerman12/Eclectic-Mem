@@ -227,14 +227,14 @@ class CURL(nn.Module):
         - to compute loss use multiclass cross entropy with identity matrix for labels
         """
         Wz = torch.matmul(self.W, z_pos.T)  # (z_dim,B)
-        logits = torch.matmul(z_a, Wz)  # (B,B)
+        # logits = torch.matmul(z_a, Wz)  # (B,B)
 
-        # # euclidean distance like NEC
-        # z_a = torch.matmul(z_a, self.W)
-        # z_pos = torch.matmul(z_pos, self.W)
-        # # TODO dim?
-        # logits = torch.cdist(z_a, z_pos, p=2)
-        # # TODO filter by euclidean distance with MHDPA representations
+        # euclidean distance like NEC
+        z_a = torch.matmul(z_a, self.W)
+        z_pos = torch.matmul(z_pos, self.W)
+        # TODO dim?
+        logits = torch.cdist(z_a, z_pos, p=2)
+        # TODO filter by euclidean distance with MHDPA representations
 
         logits = logits - torch.max(logits, 1)[0][:, None]
         return logits
@@ -517,8 +517,9 @@ class CurlSacAgent(object):
         # # += if above loss here
         # loss = (F.softmax((logits + self.omega) * self.beta) * cross_L2).sum()
         # # TODO try without beta, omega since trivial solution to only prioritize one of the diag elements, not all
-        loss = (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).mean() \
-               - torch.log(torch.diagonal(logits)).mean()
+        # loss = (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).mean() \
+        #        - torch.log(torch.diagonal(logits)).mean()
+        loss = (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).sum()
         # TODO mean?
         # TODO or
         # labels = torch.arange(logits.shape[0]).long().to(self.device)
