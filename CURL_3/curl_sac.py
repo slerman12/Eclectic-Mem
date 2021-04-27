@@ -229,14 +229,14 @@ class CURL(nn.Module):
         Wz = torch.matmul(self.W, z_pos.T)  # (z_dim,B)
         # logits = torch.matmul(z_a, Wz)  # (B,B)
 
+        # logits = logits - torch.max(logits, 1)[0][:, None]
+
         # euclidean distance like NEC
         z_a = torch.matmul(z_a, self.W)
         z_pos = torch.matmul(z_pos, self.W)
         # TODO dim?
-        logits = torch.cdist(z_a, z_pos, p=2)
+        logits = -torch.cdist(z_a, z_pos, p=2)
         # TODO filter by euclidean distance with MHDPA representations
-
-        logits = logits - torch.max(logits, 1)[0][:, None]
         return logits
 
 
