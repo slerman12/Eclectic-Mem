@@ -521,6 +521,7 @@ class CurlSacAgent(object):
         # loss = (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).mean() \
         #        - torch.log(torch.diagonal(logits)).mean()
         loss = (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).sum()
+
         # TODO mean?
         # TODO or
         # labels = torch.arange(logits.shape[0]).long().to(self.device)
