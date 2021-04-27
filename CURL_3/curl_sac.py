@@ -499,11 +499,11 @@ class CurlSacAgent(object):
 
         logits = self.CURL(z_a, z_pos)
 
-        labels = torch.arange(logits.shape[0]).long().to(self.device)
+        # labels = torch.arange(logits.shape[0]).long().to(self.device)
 
         # TODO do we need the cross entropy? do i need beta, omega in cross entropy?
         # TODO should softmax be over dim or over all?
-        loss = self.cross_entropy_loss(logits, labels)
+        # loss = self.cross_entropy_loss(logits, labels)
 
         # # maybe this loss goes in update_critic
         # TODO Note: right now anchor_q, pos_q are tuples themselves with Q1 and Q2 (edit: changed)
@@ -521,7 +521,9 @@ class CurlSacAgent(object):
         # loss = (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).mean() \
         #        - torch.log(torch.diagonal(logits)).mean()
         # loss = (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).sum()
-        loss += (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).sum()
+        loss = (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).mean()
+        # loss += (F.softmax(logits.flatten(), dim=0) * cross_L2.flatten()).sum()
+        loss -= torch.log(torch.exp(torch.diagonal(logits))).mean()
 
         # TODO mean?
         # TODO or
