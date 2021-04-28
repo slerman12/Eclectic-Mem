@@ -582,12 +582,12 @@ class CurlSacAgent(object):
                 self.encoder_tau
             )
 
-        # if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
-        #     obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
-        #     # TODO pass in q val
-        #     self.update_cpc(obs_anchor, obs_pos, L, step,
-        #                     anchor_q, pos_q
-        #                     )
+        if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
+            obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
+            # TODO pass in q val
+            self.update_cpc(obs_anchor, obs_pos, L, step,
+                            anchor_q, pos_q
+                            )
 
     def save(self, model_dir, step):
         torch.save(
