@@ -459,24 +459,24 @@ class CurlSacAgent(object):
         alpha_loss.backward()
         self.log_alpha_optimizer.step()
 
-    def update_cpc(self, obs_anchor, obs_pos, L, step):
-
-        z_a = self.CURL.encode(obs_anchor)
-        z_pos = self.CURL.encode(obs_pos, ema=True)
-
-        logits = self.CURL(z_a, z_pos)
-
-        labels = torch.arange(logits.shape[0]).long().to(self.device)
-        loss = self.cross_entropy_loss(logits, labels)
-
-        self.encoder_optimizer.zero_grad()
-        self.cpc_optimizer.zero_grad()
-        loss.backward()
-
-        self.encoder_optimizer.step()
-        self.cpc_optimizer.step()
-        if step % self.log_interval == 0:
-            L.log('train/curl_loss', loss, step)
+    # def update_cpc(self, obs_anchor, obs_pos, L, step):
+    #
+    #     z_a = self.CURL.encode(obs_anchor)
+    #     z_pos = self.CURL.encode(obs_pos, ema=True)
+    #
+    #     logits = self.CURL(z_a, z_pos)
+    #
+    #     labels = torch.arange(logits.shape[0]).long().to(self.device)
+    #     loss = self.cross_entropy_loss(logits, labels)
+    #
+    #     self.encoder_optimizer.zero_grad()
+    #     self.cpc_optimizer.zero_grad()
+    #     loss.backward()
+    #
+    #     self.encoder_optimizer.step()
+    #     self.cpc_optimizer.step()
+    #     if step % self.log_interval == 0:
+    #         L.log('train/curl_loss', loss, step)
 
     def update(self, replay_buffer, L, step, device):
         if self.encoder_type == 'pixel':
@@ -504,9 +504,9 @@ class CurlSacAgent(object):
                 self.encoder_tau
             )
 
-        if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
-            obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
-            self.update_cpc(obs_anchor, obs_pos, L, step)
+        # if step % self.cpc_update_freq == 0 and self.encoder_type == 'pixel':
+        #     obs_anchor, obs_pos = cpc_kwargs["obs_anchor"], cpc_kwargs["obs_pos"]
+        #     self.update_cpc(obs_anchor, obs_pos, L, step)
 
     def save(self, model_dir, step):
         torch.save(
