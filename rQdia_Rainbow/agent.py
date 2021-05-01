@@ -77,31 +77,23 @@ class Agent():
   def act_e_greedy(self, state, epsilon=0.001):  # High ε can reduce evaluation scores drastically
     return np.random.randint(0, self.action_space) if np.random.random() < epsilon else self.act(state)
 
-
   def learn(self, mem):
     # Sample transitions
     idxs, states, actions, returns, next_states, nonterminals, weights = mem.sample(self.batch_size)
+    aug_states_1 = aug(states).to(device=self.args.device)
+    aug_states_2 = aug(states).to(device=self.args.device)
     # Calculate current state probabilities (online network noise already sampled)
     log_ps, _ = self.online_net(states, log=True)  # Log probabilities log p(s_t, ·; θonline)
-
-    # CURL
-    # aug_states_1 = aug(states).to(device=self.args.device)
-    # aug_states_2 = aug(states).to(device=self.args.device)
-    # _, z_anch = self.online_net(aug_states_1, log=True)
-    # _, z_target = self.momentum_net(aug_states_2, log=True)
-    # z_proj = torch.matmul(self.online_net.W, z_target.T)
-    # logits = torch.matmul(z_anch, z_proj)
-    # logits = (logits - torch.max(logits, 1)[0][:, None])
-    # logits = logits * 0.1
-    # labels = torch.arange(logits.shape[0]).long().to(device=self.args.device)
-    # moco_loss = (nn.CrossEntropyLoss()(logits, labels)).to(device=self.args.device)
+    _, z_anch = self.online_net(aug_states_1, log=True)
+    _, z_target = self.momentum_net(aug_states_2, log=True)
+    z_proj = torch.matmul(self.online_net.W, z_target.T)
+    logits = torch.matmul(z_anch, z_proj)
+    logits = (logits - torch.max(logits, 1)[0][:, None])
+    logits = logits * 0.1
+    labels = torch.arange(logits.shape[0]).long().to(device=self.args.device)
+    moco_loss = (nn.CrossEntropyLoss()(logits, labels)).to(device=self.args.device)
 
     log_ps_a = log_ps[range(self.batch_size), actions]  # log p(s_t, a_t; θonline)
-
-    # rQdia
-    aug_states = aug(states).to(device=self.args.device)
-    aug_dist, _ = self.online_net(aug_states, log=True)
-    rQdia_loss = -torch.sum(aug_dist * log_ps, 1)  # Cross-entropy loss (minimises DKL(p(s_aug_t, a_t)||p(s_t, a_t)))
 
     with torch.no_grad():
       # Calculate nth next state probabilities
@@ -129,15 +121,7 @@ class Agent():
       m.view(-1).index_add_(0, (u + offset).view(-1), (pns_a * (b - l.float())).view(-1))  # m_u = m_u + p(s_t+n, a*)(b - l)
 
     loss = -torch.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimises DKL(m||p(s_t, a_t)))
-
-    # CURL
-    # loss = loss + (moco_loss * self.coeff)
-
-    # TODO test coeff
-    # rQdia
-    # loss = loss + (rQdia_loss * self.coeff)
-    loss = loss + rQdia_loss
-
+    loss = loss + (moco_loss * self.coeff)
     self.online_net.zero_grad()
     curl_loss = (weights * loss).mean()
     curl_loss.mean().backward()  # Backpropagate importance-weighted minibatch loss
