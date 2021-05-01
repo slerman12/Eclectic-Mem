@@ -34,6 +34,7 @@ class Agent():
     self.discount = args.discount
     self.norm_clip = args.norm_clip
     self.coeff = 0.01 if args.game in ['pong', 'boxing', 'private_eye', 'freeway'] else 1.
+    self.kld_loss = torch.nn.KLDivLoss()
 
     self.online_net = DQN(args, self.action_space).to(device=args.device)
     self.momentum_net = DQN(args, self.action_space).to(device=args.device)
@@ -100,8 +101,8 @@ class Agent():
 
     # rQdia
     aug_states = aug(states).to(device=self.args.device)
-    aug_dist, _ = self.online_net(aug_states, log=True)
-    rQdia_loss = -torch.sum(aug_dist * log_ps, 1)  # Cross-entropy loss (minimises DKL(p(s_aug_t, a_t)||p(s_t, a_t)))
+    aug_dist, _ = self.online_net(aug_states, log=False)
+    rQdia_loss = self.kld_loss(log_ps, aug_dist)  # Minimises DKL(p(s_aug_t, a_t)||p(s_t, a_t))
 
     with torch.no_grad():
       # Calculate nth next state probabilities
