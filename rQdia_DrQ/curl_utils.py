@@ -156,8 +156,9 @@ class ReplayBuffer(Dataset):
 
         # pos = torch.as_tensor(pos, device=self.device).float()
 
-        # obses = self.aug_trans(obses)
-        # next_obses = self.aug_trans(next_obses)
+        # TODO comment out
+        obses = self.aug_trans(obses)
+        next_obses = self.aug_trans(next_obses)
 
         pos = self.aug_trans(pos)
         next_pos = self.aug_trans(next_pos)

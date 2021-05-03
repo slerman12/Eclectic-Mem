@@ -137,8 +137,8 @@ class Agent():
 
     # TODO test coeff
     # rQdia
-    # loss = loss + (rQdia_loss * self.coeff)
-    loss = loss + rQdia_loss
+    loss = loss + (rQdia_loss * self.coeff)
+    # loss = loss + rQdia_loss
 
     self.online_net.zero_grad()
     curl_loss = (weights * loss).mean()
