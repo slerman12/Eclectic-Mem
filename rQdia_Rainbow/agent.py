@@ -16,6 +16,7 @@ from torch.nn.utils import clip_grad_norm_
 import kornia.augmentation as aug
 import torch.nn as nn
 from model import DQN
+import torch.nn.functional as F
 
 # random_shift = nn.Sequential(aug.RandomCrop((80, 80)), nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)))
 random_shift = nn.Sequential(nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)))
@@ -103,8 +104,9 @@ class Agent():
     # rQdia
     aug_states = aug(states).to(device=self.args.device)
     aug_dist, _ = self.online_net(aug_states, log=False)
-    rQdia_loss = self.kld_loss(log_ps, aug_dist)  # Minimizes DKL(p(s_aug_t, a_t)||p(s_t, a_t))
-    rQdia_loss += moco_loss
+    # rQdia_loss = self.kld_loss(log_ps, aug_dist)  # Minimizes DKL(p(s_aug_t, a_t)||p(s_t, a_t))
+    rQdia_loss = F.mse_loss(log_ps, aug_dist)
+    # rQdia_loss += moco_loss
 
     with torch.no_grad():
       # Calculate nth next state probabilities
