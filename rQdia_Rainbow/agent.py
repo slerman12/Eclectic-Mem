@@ -103,9 +103,12 @@ class Agent():
 
     # rQdia
     aug_states = aug(states).to(device=self.args.device)
-    aug_dist, _ = self.online_net(aug_states, log=False)
+    ps, _ = self.online_net(states, log=False)  # Log probabilities log p(s_t, ·; θonline)
+    # aug_dist, _ = self.online_net(aug_states, log=False)
+    log_aug_dist, _ = self.online_net(aug_states, log=True)
+    rQdia_loss = self.kld_loss(log_aug_dist, ps)
     # rQdia_loss = self.kld_loss(log_ps, aug_dist)  # Minimizes DKL(p(s_aug_t, a_t)||p(s_t, a_t))
-    rQdia_loss = F.mse_loss(log_ps, aug_dist)
+    # rQdia_loss = F.mse_loss(log_ps, aug_dist)
     # rQdia_loss += moco_loss
 
     with torch.no_grad():
