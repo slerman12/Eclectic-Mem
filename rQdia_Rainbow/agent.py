@@ -88,26 +88,27 @@ class Agent():
     log_ps, _ = self.online_net(states, log=True)  # Log probabilities log p(s_t, ·; θonline)
 
     # CURL
-    aug_states_1 = aug(states).to(device=self.args.device)
-    aug_states_2 = aug(states).to(device=self.args.device)
-    _, z_anch = self.online_net(aug_states_1, log=True)
-    _, z_target = self.momentum_net(aug_states_2, log=True)
-    z_proj = torch.matmul(self.online_net.W, z_target.T)
-    logits = torch.matmul(z_anch, z_proj)
-    logits = (logits - torch.max(logits, 1)[0][:, None])
-    logits = logits * 0.1
-    labels = torch.arange(logits.shape[0]).long().to(device=self.args.device)
-    moco_loss = (nn.CrossEntropyLoss()(logits, labels)).to(device=self.args.device)
+    # aug_states_1 = aug(states).to(device=self.args.device)
+    # aug_states_2 = aug(states).to(device=self.args.device)
+    # _, z_anch = self.online_net(aug_states_1, log=True)
+    # _, z_target = self.momentum_net(aug_states_2, log=True)
+    # z_proj = torch.matmul(self.online_net.W, z_target.T)
+    # logits = torch.matmul(z_anch, z_proj)
+    # logits = (logits - torch.max(logits, 1)[0][:, None])
+    # logits = logits * 0.1
+    # labels = torch.arange(logits.shape[0]).long().to(device=self.args.device)
+    # moco_loss = (nn.CrossEntropyLoss()(logits, labels)).to(device=self.args.device)
 
     log_ps_a = log_ps[range(self.batch_size), actions]  # log p(s_t, a_t; θonline)
 
     # rQdia
     aug_states = aug(states).to(device=self.args.device)
-    ps, _ = self.online_net(states, log=False)  # Log probabilities log p(s_t, ·; θonline)
-    # aug_dist, _ = self.online_net(aug_states, log=False)
+    # ps, _ = self.online_net(states, log=False)  # Log probabilities log p(s_t, ·; θonline)
+    aug_dist, _ = self.online_net(aug_states, log=False)
     log_aug_dist, _ = self.online_net(aug_states, log=True)
-    rQdia_loss = self.kld_loss(log_aug_dist, ps)
-    # rQdia_loss = self.kld_loss(log_ps, aug_dist)  # Minimizes DKL(p(s_aug_t, a_t)||p(s_t, a_t))
+    log_aug_dist_a = log_aug_dist[range(self.batch_size), actions]
+    # rQdia_loss = self.kld_loss(log_aug_dist, ps)
+    rQdia_loss = self.kld_loss(log_ps, aug_dist)  # Minimizes DKL(p(s_aug_t, a_t)||p(s_t, a_t))
     # rQdia_loss = F.mse_loss(log_ps, aug_dist)
     # rQdia_loss += moco_loss
 
@@ -144,6 +145,7 @@ class Agent():
     # TODO test coeff
     # rQdia
     loss = loss + (rQdia_loss * self.coeff)
+    loss = loss - torch.sum(m * log_aug_dist_a, 1)
     # loss = loss + rQdia_loss
 
     self.online_net.zero_grad()
