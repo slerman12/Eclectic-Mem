@@ -151,8 +151,8 @@ class Agent():
     # rQdia_loss = self.kld_loss(log_aug_dist_a, ps_a)
     # rQdia_loss = -torch.sum(log_ps_a * log_aug_dist_a, 1)
     # rQdia_loss = torch.nn.functional.mse_loss(log_aug_dist_a, log_ps_a)
-    rQdia_loss = self.kld_loss(aug_dist_a, ps_a)
-    # rQdia_loss = self.kld_loss(aug_dist, ps)
+    # rQdia_loss = self.kld_loss(aug_dist_a, ps_a)
+    rQdia_loss = self.kld_loss(aug_dist, ps)
     loss = loss + rQdia_loss
 
     self.online_net.zero_grad()
