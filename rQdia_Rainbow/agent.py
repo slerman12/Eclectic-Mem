@@ -141,15 +141,17 @@ class Agent():
 
     loss = -torch.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimises DKL(m||p(s_t, a_t)))
 
+    mem.update_priorities(idxs, loss.detach().cpu().numpy())  # Update priorities of sampled transitions
+
     # CURL
     # loss = loss + (moco_loss * self.coeff)
 
     # TODO test coeff
     # rQdia
-    # rQdia_loss = -torch.sum(m * log_aug_dist_a, 1)
+    rQdia_loss = -torch.sum(m * log_aug_dist_a, 1)
     # rQdia_loss = self.kld_loss(log_aug_dist_a, ps_a)
     # rQdia_loss = -torch.sum(log_ps_a * log_aug_dist_a, 1)
-    rQdia_loss = torch.nn.functional.mse_loss(log_aug_dist_a, log_ps_a)
+    # rQdia_loss = torch.nn.functional.mse_loss(log_aug_dist_a, log_ps_a)
     # rQdia_loss = self.kld_loss(aug_dist_a, ps_a)
     # rQdia_loss = self.kld_loss(aug_dist, ps)
     # rQdia_loss = torch.nn.functional.mse_loss(log_aug_dist, log_ps)
@@ -162,7 +164,7 @@ class Agent():
     clip_grad_norm_(self.online_net.parameters(), self.norm_clip)  # Clip gradients by L2 norm
     self.optimiser.step()
 
-    mem.update_priorities(idxs, loss.detach().cpu().numpy())  # Update priorities of sampled transitions
+    # mem.update_priorities(idxs, loss.detach().cpu().numpy())  # Update priorities of sampled transitions
 
   def update_target_net(self):
     self.target_net.load_state_dict(self.online_net.state_dict())
