@@ -144,7 +144,7 @@ class Agent():
 
     # TODO test coeff
     # rQdia
-    loss = loss + (rQdia_loss * self.coeff)
+    # loss = loss + (rQdia_loss * self.coeff)
     loss = loss - torch.sum(m * log_aug_dist_a, 1)
     # loss = loss + rQdia_loss
 
