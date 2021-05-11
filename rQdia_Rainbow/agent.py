@@ -110,7 +110,7 @@ class Agent():
     log_aug_dist, _ = self.online_net(aug_states, log=True)
     log_aug_dist_a = log_aug_dist[range(self.batch_size), actions]
     # rQdia_loss = self.kld_loss(log_aug_dist, ps)
-    rQdia_loss = self.kld_loss(log_ps, aug_dist)  # Minimizes DKL(p(s_aug_t, a_t)||p(s_t, a_t))
+    # rQdia_loss = self.kld_loss(log_ps, aug_dist)  # Minimizes DKL(p(s_aug_t, a_t)||p(s_t, a_t))
     # rQdia_loss = F.mse_loss(log_ps, aug_dist)
     # rQdia_loss += moco_loss
 
@@ -146,14 +146,14 @@ class Agent():
 
     # TODO test coeff
     # rQdia
-    # loss = loss + (rQdia_loss * self.coeff)
-    # rQdia_loss = -torch.sum(m * log_aug_dist_a, 1)
+    rQdia_loss = -torch.sum(m * log_aug_dist_a, 1)
     # rQdia_loss = self.kld_loss(log_aug_dist_a, ps_a)
     # rQdia_loss = -torch.sum(log_ps_a * log_aug_dist_a, 1)
     # rQdia_loss = torch.nn.functional.mse_loss(log_aug_dist_a, log_ps_a)
     # rQdia_loss = self.kld_loss(aug_dist_a, ps_a)
-    rQdia_loss = self.kld_loss(aug_dist, ps)
+    # rQdia_loss = self.kld_loss(aug_dist, ps)
     loss = loss + rQdia_loss
+    # loss = loss + (rQdia_loss * self.coeff)
 
     self.online_net.zero_grad()
     curl_loss = (weights * loss).mean()
