@@ -155,8 +155,8 @@ class Agent():
     # rQdia_loss = self.kld_loss(aug_dist_a, ps_a)
     # rQdia_loss = self.kld_loss(aug_dist, ps)
     rQdia_loss = torch.nn.functional.mse_loss(log_aug_dist, log_ps)
-    loss = loss + rQdia_loss
-    # loss = loss + (rQdia_loss * self.coeff)
+    # loss = loss + rQdia_loss
+    loss = loss + (rQdia_loss * self.coeff)
 
     self.online_net.zero_grad()
     curl_loss = (weights * loss).mean()
