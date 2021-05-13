@@ -412,19 +412,30 @@ class CurlSacAgent(object):
         # TODO is it possible to instead view after expanding without allocating new memory?
         #  Treating multiple dims as batch dims?
         #  Also, reuse encodings computed above!
-        # Can set below batch size to increase backwards pass efficiency
-        action_dist_size = c.shape[0]
-        action_inds = np.random.randint(0, c.shape[0], size=action_dist_size)
+
+        batch_size = c.shape[0]
+        # Actions
+        # ! Can set below batch size for more efficiency
+        num_actions = batch_size  # Batch Size
+        action_inds = np.random.randint(0, batch_size, size=num_actions)
         action_dist = action[action_inds]
-        action_conv = action_dist.unsqueeze(0).expand(c.shape[0], -1, -1).reshape(c.shape[0] * action_dist.shape[0],
-                                                                                  action.shape[1])
-        anchor = c.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(action_conv.shape[0], c.shape[1])
-        pos = c_aug.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(anchor.shape)
-        # compute q for each
+        action_conv = action_dist.unsqueeze(0).expand(batch_size, -1, -1)
+        action_conv = action_conv.reshape(batch_size * num_actions, action.shape[1])
+        # Anchor and augmented
+        # (c is the visual encoding, c = encoder(s_t), c_aug = encoder(aug(s_t)) )
+        anchor = c.unsqueeze(1).expand(-1, num_actions, -1)
+        anchor = anchor.reshape(batch_size * num_actions, c.shape[1])
+        aug = c_aug.unsqueeze(1).expand(-1, num_actions, -1).reshape(anchor.shape)
+        # Compute Q-value distribution for each
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
-        pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
-        # TODO should this employ torch.min?
-        critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
+        aug_q = self.critic(aug, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
+        # TODO detach
+        # anchor_q[0] = anchor_q[0].detach()
+        # anchor_q[1] = anchor_q[1].detach()
+        # rQdia
+        # (SAC-AE uses two Q networks)
+        critic_loss += F.mse_loss(anchor_q[0], aug_q[0]) + \
+                       F.mse_loss(anchor_q[1], aug_q[1])
 
         if step % self.log_interval == 0:
             L.log('train_critic/loss', critic_loss, step)
@@ -436,12 +447,18 @@ class CurlSacAgent(object):
 
         self.critic.log(L, step)
 
-        return torch.min(*anchor_q), torch.min(*pos_q)
+        return torch.min(*anchor_q), torch.min(*aug_q)
 
-    def update_actor_and_alpha(self, obs, L, step):
+    def update_actor_and_alpha(self, obs, L, step, cpc_kwargs):
+        obs_aug, next_obs_aug = cpc_kwargs["obs_pos"], cpc_kwargs["next_pos"]
+
         # detach encoder, so we don't update it with the actor loss
         _, pi, log_pi, log_std = self.actor(obs, detach_encoder=True)
         actor_Q1, actor_Q2 = self.critic(obs, pi, detach_encoder=True)
+
+        # TODO MSE between log_pi and aug_log_pi (rQadia: regularizing q-values and actions with image aug)
+        # _, _, aug_log_pi, _ = self.actor(obs_aug, detach_encoder=True)
+        # rQadia_loss = F.mse_loss(log_pi, aug_log_pi)
 
         actor_Q = torch.min(actor_Q1, actor_Q2)
         actor_loss = (self.alpha.detach() * log_pi - actor_Q).mean()
@@ -483,7 +500,7 @@ class CurlSacAgent(object):
         # self.update_critic(obs, action, reward, next_obs, not_done, L, step, cpc_kwargs)
 
         if step % self.actor_update_freq == 0:
-            self.update_actor_and_alpha(obs, L, step)
+            self.update_actor_and_alpha(obs, L, step, cpc_kwargs)
 
         if step % self.critic_target_update_freq == 0:
             curl_utils.soft_update_params(
