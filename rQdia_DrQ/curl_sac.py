@@ -430,12 +430,12 @@ class CurlSacAgent(object):
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
         aug_q = self.critic(aug, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
         # TODO detach
-        anchor_q[0] = anchor_q[0].detach()
-        anchor_q[1] = anchor_q[1].detach()
+        # anchor_q[0] = anchor_q[0].detach()
+        # anchor_q[1] = anchor_q[1].detach()
         # rQdia
         # (SAC-AE uses two Q networks)
-        critic_loss += F.mse_loss(anchor_q[0], aug_q[0]) + \
-                       F.mse_loss(anchor_q[1], aug_q[1])
+        critic_loss += F.mse_loss(anchor_q[0].detach(), aug_q[0]) + \
+                       F.mse_loss(anchor_q[1].detach(), aug_q[1])
 
         if step % self.log_interval == 0:
             L.log('train_critic/loss', critic_loss, step)
