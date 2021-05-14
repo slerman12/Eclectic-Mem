@@ -416,7 +416,7 @@ class CurlSacAgent(object):
         batch_size = c.shape[0]
         # Actions
         # ! Can set below batch size for more efficiency
-        num_actions = 25  # Batch Size
+        num_actions = batch_size  # Batch Size
         action_inds = np.random.randint(0, batch_size, size=num_actions)
         action_dist = action[action_inds]
         action_conv = action_dist.unsqueeze(0).expand(batch_size, -1, -1)
@@ -429,9 +429,6 @@ class CurlSacAgent(object):
         # Compute Q-value distribution for each
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
         aug_q = self.critic(aug, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
-        # TODO detach
-        # anchor_q[0] = anchor_q[0].detach()
-        # anchor_q[1] = anchor_q[1].detach()
         # rQdia
         # (SAC-AE uses two Q networks)
         critic_loss += F.mse_loss(anchor_q[0], aug_q[0]) + \
