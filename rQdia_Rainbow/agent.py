@@ -167,8 +167,10 @@ class Agent():
       aug_m.view(-1).index_add_(0, (aug_l + aug_offset).view(-1), (aug_pns_a * (aug_u.float() - aug_b)).view(-1))  # m_l = m_l + p(s_t+n, a*)(u - b)
       aug_m.view(-1).index_add_(0, (aug_u + aug_offset).view(-1), (aug_pns_a * (aug_b - aug_l.float())).view(-1))  # m_u = m_u + p(s_t+n, a*)(b - l)
 
-    # loss = -torch.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimises DKL(m||p(s_t, a_t)))
-    loss = -torch.sum((m+aug_m)/2 * (log_ps_a+log_aug_dist_a)/2, 1)
+    loss = -torch.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimises DKL(m||p(s_t, a_t)))
+    # loss = -torch.sum((m+aug_m)/2 * (log_ps_a+log_aug_dist_a)/2, 1)
+
+    loss += -torch.sum(aug_m * log_aug_dist_a, 1)
 
     mem.update_priorities(idxs, loss.detach().cpu().numpy())  # Update priorities of sampled transitions
 
