@@ -416,7 +416,7 @@ class CurlSacAgent(object):
         batch_size = c.shape[0]
         # Actions
         # ! Can set below batch size for more efficiency
-        num_actions = batch_size  # Batch Size
+        num_actions = 25  # Batch Size
         action_inds = np.random.randint(0, batch_size, size=num_actions)
         action_dist = action[action_inds]
         action_conv = action_dist.unsqueeze(0).expand(batch_size, -1, -1)
