@@ -91,6 +91,7 @@ class ReplayBuffer(Dataset):
         self.last_save = 0
         self.full = False
 
+        # TODO try padding -> resize
         image_pad = 4
         self.aug_trans = nn.Sequential(
             nn.ReplicationPad2d(image_pad),

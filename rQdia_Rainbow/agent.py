@@ -18,6 +18,7 @@ import torch.nn as nn
 from model import DQN
 import torch.nn.functional as F
 
+# TODO try padding -> resize
 # random_shift = nn.Sequential(aug.RandomCrop((80, 80)), nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)))
 random_shift = nn.Sequential(nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)))
 aug = random_shift
