@@ -94,8 +94,10 @@ class ReplayBuffer(Dataset):
         # TODO try padding -> resize
         image_pad = 4
         self.aug_trans = nn.Sequential(
-            nn.ReplicationPad2d(image_pad),
-            kornia.augmentation.RandomCrop((obs_shape[-1], obs_shape[-1])))
+            nn.ReplicationPad2d(image_pad))
+        # self.aug_trans = nn.Sequential(
+        #     nn.ReplicationPad2d(image_pad),
+        #     kornia.augmentation.RandomCrop((obs_shape[-1], obs_shape[-1])))
 
     def add(self, obs, action, reward, next_obs, done):
 
@@ -161,8 +163,12 @@ class ReplayBuffer(Dataset):
         # obses = self.aug_trans(obses)
         # next_obses = self.aug_trans(next_obses)
 
-        pos = self.aug_trans(pos)
-        next_pos = self.aug_trans(next_pos)
+        aug = lambda img: kornia.geometry.transform.resize(self.aug_trans(img), (pos.shape[-1], pos.shape[-1]))
+
+        # pos = self.aug_trans(pos)
+        # next_pos = self.aug_trans(next_pos)
+        pos = aug(pos)
+        next_pos = aug(next_pos)
 
         cpc_kwargs = dict(obs_anchor=obses, obs_pos=pos, next_pos=next_pos,
                           time_anchor=None, time_pos=None)
