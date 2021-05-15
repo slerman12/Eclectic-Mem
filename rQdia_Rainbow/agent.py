@@ -29,9 +29,9 @@ class Intensity(nn.Module):
 
 # TODO try padding -> resize
 # random_shift = nn.Sequential(aug.RandomCrop((80, 80)), nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)))
-# random_shift = nn.Sequential(nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)))
-random_shift_intensity = nn.Sequential(nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)), Intensity(scale=0.05))
-aug = random_shift_intensity
+random_shift = nn.Sequential(nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)))
+# random_shift_intensity = nn.Sequential(nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)), Intensity(scale=0.05))
+aug = random_shift
 
 class Agent():
   def __init__(self, args, env):
