@@ -5,11 +5,12 @@ import os
 import time
 
 from pathlib import Path
+import socket
 
 os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
 import dmc2gym
 import numpy as np
-import socket
+
 import torch
 
 import curl_utils
