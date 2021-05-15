@@ -152,33 +152,33 @@ class Agent():
 
 
 
-      # Calculate nth next state probabilities
-      aug_next_states = aug(next_states)
-      aug_pns, _ = self.online_net(aug_next_states)  # Probabilities p(s_t+n, ·; θonline)
-      aug_dns = self.support.expand_as(aug_pns) * aug_pns  # Distribution d_t+n = (z, p(s_t+n, ·; θonline))
-      aug_argmax_indices_ns = aug_dns.sum(2).argmax(1)  # Perform argmax action selection using online network: argmax_a[(z, p(s_t+n, a; θonline))]
-      self.target_net.reset_noise()  # Sample new target net noise
-      aug_pns, _ = self.target_net(aug_next_states)  # Probabilities p(s_t+n, ·; θtarget)
-      aug_pns_a = aug_pns[range(self.batch_size), aug_argmax_indices_ns]  # Double-Q probabilities p(s_t+n, argmax_a[(z, p(s_t+n, a; θonline))]; θtarget)
+      # # Calculate nth next state probabilities
+      # aug_next_states = aug(next_states)
+      # aug_pns, _ = self.online_net(aug_next_states)  # Probabilities p(s_t+n, ·; θonline)
+      # aug_dns = self.support.expand_as(aug_pns) * aug_pns  # Distribution d_t+n = (z, p(s_t+n, ·; θonline))
+      # aug_argmax_indices_ns = aug_dns.sum(2).argmax(1)  # Perform argmax action selection using online network: argmax_a[(z, p(s_t+n, a; θonline))]
+      # self.target_net.reset_noise()  # Sample new target net noise
+      # aug_pns, _ = self.target_net(aug_next_states)  # Probabilities p(s_t+n, ·; θtarget)
+      # aug_pns_a = aug_pns[range(self.batch_size), aug_argmax_indices_ns]  # Double-Q probabilities p(s_t+n, argmax_a[(z, p(s_t+n, a; θonline))]; θtarget)
+      #
+      # # Compute Tz (Bellman operator T applied to z)
+      # aug_Tz = returns.unsqueeze(1) + nonterminals * (self.discount ** self.n) * self.support.unsqueeze(0)  # Tz = R^n + (γ^n)z (accounting for terminal states)
+      # aug_Tz = aug_Tz.clamp(min=self.Vmin, max=self.Vmax)  # Clamp between supported values
+      # # Compute L2 projection of Tz onto fixed support z
+      # aug_b = (aug_Tz - self.Vmin) / self.delta_z  # b = (Tz - Vmin) / Δz
+      # aug_l, aug_u = aug_b.floor().to(torch.int64), aug_b.ceil().to(torch.int64)
+      # # Fix disappearing probability mass when l = b = u (b is int)
+      # aug_l[(aug_u > 0) * (aug_l == aug_u)] -= 1
+      # aug_u[(aug_l < (self.atoms - 1)) * (aug_l == aug_u)] += 1
+      #
+      # # Distribute probability of Tz
+      # aug_m = states.new_zeros(self.batch_size, self.atoms)
+      # aug_offset = torch.linspace(0, ((self.batch_size - 1) * self.atoms), self.batch_size).unsqueeze(1).expand(self.batch_size, self.atoms).to(actions)
+      # aug_m.view(-1).index_add_(0, (aug_l + aug_offset).view(-1), (aug_pns_a * (aug_u.float() - aug_b)).view(-1))  # m_l = m_l + p(s_t+n, a*)(u - b)
+      # aug_m.view(-1).index_add_(0, (aug_u + aug_offset).view(-1), (aug_pns_a * (aug_b - aug_l.float())).view(-1))  # m_u = m_u + p(s_t+n, a*)(b - l)
 
-      # Compute Tz (Bellman operator T applied to z)
-      aug_Tz = returns.unsqueeze(1) + nonterminals * (self.discount ** self.n) * self.support.unsqueeze(0)  # Tz = R^n + (γ^n)z (accounting for terminal states)
-      aug_Tz = aug_Tz.clamp(min=self.Vmin, max=self.Vmax)  # Clamp between supported values
-      # Compute L2 projection of Tz onto fixed support z
-      aug_b = (aug_Tz - self.Vmin) / self.delta_z  # b = (Tz - Vmin) / Δz
-      aug_l, aug_u = aug_b.floor().to(torch.int64), aug_b.ceil().to(torch.int64)
-      # Fix disappearing probability mass when l = b = u (b is int)
-      aug_l[(aug_u > 0) * (aug_l == aug_u)] -= 1
-      aug_u[(aug_l < (self.atoms - 1)) * (aug_l == aug_u)] += 1
-
-      # Distribute probability of Tz
-      aug_m = states.new_zeros(self.batch_size, self.atoms)
-      aug_offset = torch.linspace(0, ((self.batch_size - 1) * self.atoms), self.batch_size).unsqueeze(1).expand(self.batch_size, self.atoms).to(actions)
-      aug_m.view(-1).index_add_(0, (aug_l + aug_offset).view(-1), (aug_pns_a * (aug_u.float() - aug_b)).view(-1))  # m_l = m_l + p(s_t+n, a*)(u - b)
-      aug_m.view(-1).index_add_(0, (aug_u + aug_offset).view(-1), (aug_pns_a * (aug_b - aug_l.float())).view(-1))  # m_u = m_u + p(s_t+n, a*)(b - l)
-
-    # loss = -torch.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimises DKL(m||p(s_t, a_t)))
-    loss = -torch.sum((m+aug_m)/2 * (log_ps_a+log_aug_dist_a)/2, 1)
+    loss = -torch.sum(m * log_ps_a, 1)  # Cross-entropy loss (minimises DKL(m||p(s_t, a_t)))
+    # loss = -torch.sum((m+aug_m)/2 * (log_ps_a+log_aug_dist_a)/2, 1)
 
     # loss += -torch.sum(aug_m * log_aug_dist_a, 1)
 
