@@ -18,10 +18,20 @@ import torch.nn as nn
 from model import DQN
 import torch.nn.functional as F
 
+class Intensity(nn.Module):
+  def __init__(self, scale):
+    super().__init__()
+    self.scale = scale
+  def forward(self, x):
+    r = torch.randn((x.size(0), 1, 1, 1), device=x.device)
+    noise = 1.0 + (self.scale * r.clamp(-2.0, 2.0))
+    return x * noise
+
 # TODO try padding -> resize
 # random_shift = nn.Sequential(aug.RandomCrop((80, 80)), nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)))
-random_shift = nn.Sequential(nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)))
-aug = random_shift
+# random_shift = nn.Sequential(nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)))
+random_shift_intensity = nn.Sequential(nn.ReplicationPad2d(4), aug.RandomCrop((84, 84)), Intensity(scale=0.05))
+aug = random_shift_intensity
 
 class Agent():
   def __init__(self, args, env):
