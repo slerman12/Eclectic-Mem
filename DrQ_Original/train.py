@@ -8,7 +8,17 @@ import time
 import numpy as np
 
 import dmc2gym
+
+import socket
+from pathlib import Path
+
+os.environ['LD_LIBRARY_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin:/usr/lib/nvidia-440')
+os.environ['MJLIB_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin/libmujoco200.so')
+os.environ['MJKEY_PATH'] = str(Path.home() / f'.mujoco/mjkey_{socket.getfqdn()}.txt')
+os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
+
 import hydra
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -167,12 +177,20 @@ class Workspace(object):
             self.step += 1
 
 
-@hydra.main(config_path='config.yaml', strict=True)
+@hydra.main(config_name='config')
 def main(cfg):
     from train import Workspace as W
     workspace = W(cfg)
     workspace.run()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
+    from clearml import Task
+    from clearml import Logger as TrainLogger
+
+    results_dir = 'results'
+    if not os.path.exists(results_dir):
+        os.makedirs(results_dir)
+    Task.init(project_name=f"DrQ", task_name=f"Original", output_uri=str(results_dir))
+
     main()

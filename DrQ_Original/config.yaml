@@ -28,7 +28,11 @@ frame_stack: 3
 lr: 1e-3
 # IMPORTANT: please use a batch size of 512 to reproduce the results in the paper. Hovewer, with a smaller batch size it still works well.
 batch_size: 128
-
+# hydra configuration
+# hydra:
+#   name: ${env}
+#   run:
+#     dir: ./runs/${now:%Y.%m.%d}/${now:%H%M%S}_${hydra.job.override_dirname}
 # agent configuration
 agent:
   name: drq
@@ -73,8 +77,4 @@ encoder:
       feature_dim: 50
 
 
-# hydra configuration
-hydra:
-  name: ${env}
-  run:
-    dir: ./runs/${now:%Y.%m.%d}/${now:%H%M%S}_${hydra.job.override_dirname}
+

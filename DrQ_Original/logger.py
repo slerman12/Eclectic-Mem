@@ -10,6 +10,7 @@ import torch
 import torchvision
 from termcolor import colored
 from torch.utils.tensorboard import SummaryWriter
+from clearml import Logger as TrainLogger
 
 COMMON_TRAIN_FORMAT = [('episode', 'E', 'int'), ('step', 'S', 'int'),
                        ('episode_reward', 'R', 'float'),
@@ -116,6 +117,7 @@ class Logger(object):
         self._log_dir = log_dir
         self._log_frequency = log_frequency
         self._action_repeat = action_repeat
+        self.trains_logger = TrainLogger.current_logger()
         if save_tb:
             tb_dir = os.path.join(log_dir, 'tb')
             if os.path.exists(tb_dir):
@@ -166,13 +168,20 @@ class Logger(object):
         if self._sw is not None:
             self._sw.add_histogram(key, histogram, step)
 
-    def log(self, key, value, step, n=1, log_frequency=1):
-        if not self._should_log(step, log_frequency):
-            return
+    def log(self, key, value, step, n=1):
         assert key.startswith('train') or key.startswith('eval')
         if type(value) == torch.Tensor:
             value = value.item()
-        self._try_sw_log(key, value / n, step)
+        # self._try_sw_log(key, value / n, step)
+        prefix, linename = key.split('/')
+        prefix_text = 'Training' if prefix == 'train' else prefix
+        changedict = {
+            'episode_reward': 'Reward'
+        }
+        if linename not in ['episode', 'step', 'duration']:
+            self.trains_logger.report_scalar(prefix_text,
+                                             changedict.get(linename, linename),
+                                             iteration=step, value=value / n)
         mg = self._train_mg if key.startswith('train') else self._eval_mg
         mg.log(key, value, n)
 
