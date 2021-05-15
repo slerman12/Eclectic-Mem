@@ -4,6 +4,9 @@ import os
 # import gym
 import time
 
+from pathlib import Path
+
+os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
 import dmc2gym
 import numpy as np
 import socket
@@ -13,10 +16,8 @@ import curl_utils
 from curl_sac import CurlSacAgent
 from logger import Logger
 from video import VideoRecorder
-from clearml import Task
 
-from pathlib import Path
-os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
+from clearml import Task
 
 
 def parse_args():
