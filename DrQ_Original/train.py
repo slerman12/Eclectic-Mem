@@ -8,14 +8,16 @@ import time
 import numpy as np
 
 import dmc2gym
-
+import os
 import socket
+
 from pathlib import Path
+
+os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
 
 os.environ['LD_LIBRARY_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin:/usr/lib/nvidia-440')
 os.environ['MJLIB_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin/libmujoco200.so')
 os.environ['MJKEY_PATH'] = str(Path.home() / f'.mujoco/mjkey_{socket.getfqdn()}.txt')
-os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
 
 import hydra
 

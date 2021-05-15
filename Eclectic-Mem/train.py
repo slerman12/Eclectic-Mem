@@ -3,6 +3,12 @@ import dmc2gym
 import json
 import numpy as np
 import os
+import socket
+
+from pathlib import Path
+
+os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
+import os
 # import gym
 import socket
 import time
@@ -13,6 +19,7 @@ from EclecticReplay import EclecticMem
 from em_sac import EclecticMemCurlSacAgent
 from logger import Logger
 from video import VideoRecorder
+
 from clearml import Task
 from pathlib import Path
 
