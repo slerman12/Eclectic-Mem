@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=2 python train.py --expname rQdia-dqr-ball_in_cup-catch \
+CUDA_VISIBLE_DEVICES=2 python train.py --expname rQdia-dqr-ball_in_cup-catch-${1:--1} \
     --domain_name ball_in_cup \
     --task_name catch \
     --encoder_type pixel \

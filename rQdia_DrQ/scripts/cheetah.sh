@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=1 python train.py --expname rQdia-dqr-cheetah-run \
+CUDA_VISIBLE_DEVICES=1 python train.py --expname rQdia-dqr-cheetah-run-${1:--1} \
     --domain_name cheetah \
     --task_name run \
     --encoder_type pixel \

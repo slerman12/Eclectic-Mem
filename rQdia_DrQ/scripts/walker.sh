@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=2 python train.py --expname rQdia-dqr-walker-walk \
+CUDA_VISIBLE_DEVICES=2 python train.py --expname rQdia-dqr-walker-walk-${1:--1} \
     --domain_name walker \
     --task_name walk \
     --encoder_type pixel \
