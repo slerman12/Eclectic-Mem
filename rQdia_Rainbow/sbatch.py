@@ -24,7 +24,7 @@ def slurm_script_generalized():
 #SBATCH {}
 {}
 #SBATCH -t 5-00:00:00 -o ./{}.log -J {}
-#SBATCH --mem=1gb 
+#SBATCH --mem=2gb 
 {}
 module load {}
 python3 {} {}
