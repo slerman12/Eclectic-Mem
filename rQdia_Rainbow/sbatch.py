@@ -29,8 +29,8 @@ def slurm_script_generalized():
 module load {}
 python3 {} {}
 """.format("-c 1" if args.cpu else "-p gpu",
-           # "" if args.cpu else "#SBATCH -p csxu -A cxu22_lab --gres=gpu",
-           "#SBATCH -p csxu -A cxu22_lab" if args.cpu else "#SBATCH -p csxu -A cxu22_lab --gres=gpu",
+           "" if args.cpu else "#SBATCH -p csxu -A cxu22_lab --gres=gpu",
+           # "#SBATCH -p csxu -A cxu22_lab" if args.cpu else "#SBATCH -p csxu -A cxu22_lab --gres=gpu",
            args.name, args.name,
            "#SBATCH -C K80" if args.bigger_gpu else "#SBATCH -C V100" if args.biggest_gpu else "",
            args.module, args.file, args.params)
