@@ -1,27 +1,29 @@
 import argparse
 import json
 import os
+from pathlib import Path
+import socket
+
+os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
 # import gym
 import time
 
 import dmc2gym
 import numpy as np
-import socket
+
 import torch
 
 import curl_utils
 from curl_sac import CurlSacAgent
 from logger import Logger
 from video import VideoRecorder
-from clearml import Task
 
-from pathlib import Path
-os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
+from clearml import Task
 
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    # environment
+    # environmentK
     parser.add_argument('--domain_name', default='cartpole')
     parser.add_argument('--task_name', default='swingup')
     parser.add_argument('--expname', default=None)
