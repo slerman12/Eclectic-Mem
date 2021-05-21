@@ -487,7 +487,7 @@ class CurlSacAgent(object):
         if step % self.log_interval == 0:
             L.log('train/batch_reward', reward.mean(), step)
 
-        self.update_critic(obs, action, reward, next_obs, not_done, L, step)
+        self.update_critic(obs, action, reward, next_obs, not_done, L, step, cpc_kwargs)
 
         if step % self.actor_update_freq == 0:
             self.update_actor_and_alpha(obs, L, step)

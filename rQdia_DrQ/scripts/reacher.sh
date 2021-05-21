@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=1 python train.py --expname rQdia-dqr-reacher-easy-${1:--1} \
+CUDA_VISIBLE_DEVICES=0 python train.py --expname rQdia-dqr-reacher-easy-${1:--1} \
     --domain_name reacher \
     --task_name easy \
     --encoder_type pixel \

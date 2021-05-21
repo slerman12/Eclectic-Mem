@@ -160,7 +160,6 @@ def main(rank):
     os.environ['LD_LIBRARY_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin:/usr/lib/nvidia-440')
     os.environ['MJLIB_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin/libmujoco200.so')
     os.environ['MJKEY_PATH'] = str(Path.home() / f'.mujoco/mjkey_{socket.getfqdn()}.txt')
-    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
     args = parse_args()
 
     snapshots_path = Path('./experiments')
