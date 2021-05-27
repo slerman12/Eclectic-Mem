@@ -98,6 +98,8 @@ class Agent():
     # Calculate current state probabilities (online network noise already sampled)
     log_ps, _ = self.online_net(states, log=True)  # Log probabilities log p(s_t, ·; θonline)
 
+    log_target_ps, _ = self.target_net(states, log=True)
+
     # CURL
     # aug_states_1 = aug(states).to(device=self.args.device)
     # aug_states_2 = aug(states).to(device=self.args.device)
@@ -119,6 +121,7 @@ class Agent():
     aug_dist, _ = self.online_net(aug_states, log=False)
     aug_dist_a = aug_dist[range(self.batch_size), actions]
     log_aug_dist, _ = self.online_net(aug_states, log=True)
+    log_aug_dist_target, _ = self.target_net(aug_states, log=True)
     log_aug_dist_a = log_aug_dist[range(self.batch_size), actions]
     # rQdia_loss = self.kld_loss(log_aug_dist, ps)
     # rQdia_loss = self.kld_loss(log_ps, aug_dist)  # Minimizes DKL(p(s_aug_t, a_t)||p(s_t, a_t))
@@ -195,7 +198,9 @@ class Agent():
     # rQdia_loss = torch.nn.functional.mse_loss(log_aug_dist_a, log_ps_a)
     # rQdia_loss = self.kld_loss(aug_dist_a, ps_a)
     # rQdia_loss = self.kld_loss(aug_dist, ps)
+    # Todo optimzie target net as well!!!
     rQdia_loss = torch.nn.functional.mse_loss(log_aug_dist, log_ps)
+    rQdia_loss += torch.nn.functional.mse_loss(log_aug_dist_target, log_target_ps)
     loss = loss + rQdia_loss
     # loss = loss + (rQdia_loss * self.coeff)
 
