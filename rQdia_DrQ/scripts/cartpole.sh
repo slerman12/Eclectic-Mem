@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=3 python train.py --expname rQdia-dqr-cartpole-swingup-${1:--1} \
+CUDA_VISIBLE_DEVICES=0 python train.py --expname rQdia-dqr-cartpole-swingup-${1:--1} \
     --domain_name cartpole \
     --task_name swingup \
     --encoder_type pixel \

@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=3 python train.py --expname rQdia-dqr-finger-spin-${1:--1} \
+CUDA_VISIBLE_DEVICES=1 python train.py --expname rQdia-dqr-finger-spin-${1:--1} \
     --domain_name finger \
     --task_name spin \
     --encoder_type pixel \

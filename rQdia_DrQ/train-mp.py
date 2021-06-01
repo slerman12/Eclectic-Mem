@@ -4,7 +4,8 @@ import os
 from pathlib import Path
 import socket
 
-os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
+if not os.environ.get('USER') == 'jbi5':
+    os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
 # import gym
 import time
 
@@ -12,13 +13,17 @@ import dmc2gym
 import numpy as np
 
 import torch
-
+import torch.multiprocessing as mp
 import curl_utils
 from curl_sac import CurlSacAgent
 from logger import Logger
 from video import VideoRecorder
-
 from clearml import Task
+from pathlib import Path
+
+os.environ['LD_LIBRARY_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin:/usr/lib/nvidia-440')
+os.environ['MJLIB_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin/libmujoco200.so')
+os.environ['MJKEY_PATH'] = str(Path.home() / f'.mujoco/mjkey_{socket.getfqdn()}.txt')
 
 
 def parse_args():
@@ -38,7 +43,7 @@ def parse_args():
     parser.add_argument('--agent', default='curl_sac', type=str)
     parser.add_argument('--init_steps', default=1000, type=int)
     parser.add_argument('--num_train_steps', default=250000, type=int)
-    parser.add_argument('--batch_size', default=32, type=int)
+    parser.add_argument('--batch_size', default=128, type=int)
     parser.add_argument('--hidden_dim', default=1024, type=int)
     # eval
     parser.add_argument('--eval_freq', default=10000, type=int)
@@ -155,17 +160,14 @@ def make_agent(obs_shape, action_shape, args, device):
         assert 'agent is not supported: %s' % args.agent
 
 
-def main(rank):
-    from pathlib import Path
-    os.environ['LD_LIBRARY_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin:/usr/lib/nvidia-440')
-    os.environ['MJLIB_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin/libmujoco200.so')
-    os.environ['MJKEY_PATH'] = str(Path.home() / f'.mujoco/mjkey_{socket.getfqdn()}.txt')
+def main(seed):
     args = parse_args()
-
+    args.seed = seed
     snapshots_path = Path('./experiments')
     snapshots_path.mkdir(parents=True, exist_ok=True)
+    time.sleep(np.random.randint(1, 3))
     Task.init(project_name="Eclectic-Mem",
-              task_name=f"{args.domain_name}-{args.task_name}" if not args.expname else args.expname,
+              task_name=f"{args.domain_name}-{args.task_name}-{args.seed}" if not args.expname else args.expname,
               output_uri=str(snapshots_path))
 
     if args.seed == -1:
@@ -194,7 +196,6 @@ def main(rank):
     exp_name = env_name + '-' + ts + '-im' + str(args.image_size) + '-b' \
                + str(args.batch_size) + '-s' + str(args.seed) + '-' + args.encoder_type
     args.work_dir = args.work_dir + '/' + exp_name
-    from pathlib import Path
     work_dir = Path('.') / args.work_dir
     work_dir.mkdir(parents=True, exist_ok=True)
     video_dir = curl_utils.make_dir(os.path.join(args.work_dir, 'video'))
@@ -287,6 +288,15 @@ def main(rank):
 
 
 if __name__ == '__main__':
-    # torch.multiprocessing.set_start_method('spawn')
-    main(0)
+    WORLDSIZE = 3
+    mp.set_start_method('spawn', force=True)
+    seeds = set()
+    while len(seeds) != 20:
+        seeds.add(np.random.randint(1, 1000000))
+    with mp.Pool(3) as pool:
+        pool.map(main, seeds)
+    # mp.spawn(main,
+    #          args=(WORLDSIZE,),
+    #          nprocs=WORLDSIZE,
+    #          join=True)
     # torch.multiprocessing.spawn(main, nprocs=2, join=True)

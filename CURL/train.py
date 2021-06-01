@@ -8,11 +8,14 @@ import dmc2gym
 import numpy as np
 import socket
 import torch
+from pathlib import Path
 
+os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
 import curl_utils
 from curl_sac import CurlSacAgent
 from logger import Logger
 from video import VideoRecorder
+
 from clearml import Task
 
 
@@ -155,7 +158,6 @@ def main(rank):
     os.environ['LD_LIBRARY_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin:/usr/lib/nvidia-440')
     os.environ['MJLIB_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin/libmujoco200.so')
     os.environ['MJKEY_PATH'] = str(Path.home() / f'.mujoco/mjkey_{socket.getfqdn()}.txt')
-    os.environ['CUDA_VISIBLE_DEVICES'] = '3'
     args = parse_args()
 
     snapshots_path = Path('./experiments')
