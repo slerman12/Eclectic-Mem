@@ -5,6 +5,6 @@ for game in "alien" "amidar" "assault" "asterix" "bank_heist" "battle_zone" "box
 #for game in "breakout" "jamesbond" "krull"
 #for game in "chopper_command" "asterix" "battle_zone" "bank_heist" "amidar" "assault" "alien"
 do
-	python3 sbatch.py --cpu --name curlre$game$seed --params "--game $game --seed $seed --expname curlr$game$seed"
+	python3 sbatch.py --cpu --name curl_rerun_$game$seed --params "--game $game --seed $seed --expname curl_rerun_$game$seed"
 	sleep 2
 done
