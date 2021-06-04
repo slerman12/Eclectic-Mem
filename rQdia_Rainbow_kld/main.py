@@ -28,8 +28,8 @@ from pathlib import Path
 import socket
 
 os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
-from clearml import Task
-from clearml import Logger as TrainLogger
+# from clearml import Task
+# from clearml import Logger as TrainLogger
 import subprocess
 
 # label = subprocess.check_output(["git", "describe"]).strip()
@@ -101,9 +101,9 @@ results_dir = os.path.join('results', f"{args.expname}-{args.id}")
 if not os.path.exists(results_dir):
     os.makedirs(results_dir)
 
-Task.init(project_name=f"rQdia-Rainbow", task_name=f"{args.expname}", output_uri=results_dir)
+# Task.init(project_name=f"rQdia-Rainbow", task_name=f"{args.expname}", output_uri=results_dir)
 
-logger = TrainLogger.current_logger()
+# logger = TrainLogger.current_logger()
 
 metrics = {'steps': [], 'rewards': [], 'Qs': [], 'best_avg_reward': -float('inf')}
 np.random.seed(args.seed)
@@ -209,8 +209,8 @@ else:
                 avg_reward, avg_Q = test(args, T, dqn, val_mem, metrics, results_dir)  # Test
                 log('T = ' + str(T) + ' / ' + str(args.T_max) + ' | Avg. reward: ' + str(
                     avg_reward) + ' | Avg. Q: ' + str(avg_Q))
-                logger.report_scalar('Evaluating', 'Avg. reward', iteration=T, value=avg_reward)
-                logger.report_scalar('Evaluating', 'Avg. Q', iteration=T, value=avg_Q)
+                # logger.report_scalar('Evaluating', 'Avg. reward', iteration=T, value=avg_reward)
+                # logger.report_scalar('Evaluating', 'Avg. Q', iteration=T, value=avg_Q)
                 dqn.train()  # Set DQN (online network) back to training mode
 
                 # If memory path provided, save it
