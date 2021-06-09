@@ -4,9 +4,9 @@ import os
 from pathlib import Path
 import socket
 
-if not os.environ.get('USER') == 'jbi5':
-    os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
-# import gym
+# if not os.environ.get('USER') == 'jbi5':
+#     os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
+# # import gym
 import time
 
 import dmc2gym
