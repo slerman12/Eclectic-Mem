@@ -293,7 +293,7 @@ if __name__ == '__main__':
     seeds = set()
     while len(seeds) != 20:
         seeds.add(np.random.randint(1, 1000000))
-    with mp.Pool(3) as pool:
+    with mp.Pool(4) as pool:
         pool.map(main, seeds)
     # mp.spawn(main,
     #          args=(WORLDSIZE,),
