@@ -413,12 +413,32 @@ class CurlSacAgent(object):
         #  Treating multiple dims as batch dims?
         #  Also, reuse encodings computed above!
 
+        # batch_size = c.shape[0]
+        # # Actions
+        # # ! Can set below batch size for more efficiency
+        # num_actions = batch_size  # Batch Size
+        # action_inds = np.random.randint(0, batch_size, size=num_actions)
+        # action_dist = action[action_inds]
+        # action_conv = action_dist.unsqueeze(0).expand(batch_size, -1, -1)
+        # action_conv = action_conv.reshape(batch_size * num_actions, action.shape[1])
+        # # Anchor and augmented
+        # # (c is the visual encoding, c = encoder(s_t), c_aug = encoder(aug(s_t)) )
+        # anchor = c.unsqueeze(1).expand(-1, num_actions, -1)
+        # anchor = anchor.reshape(batch_size * num_actions, c.shape[1])
+        # aug = c_aug.unsqueeze(1).expand(-1, num_actions, -1).reshape(anchor.shape)
+        # # Compute Q-value distribution for each
+        # anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
+        # aug_q = self.critic(aug, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
+        # # rQdia
+        # # (SAC-AE uses two Q networks)
+        # critic_loss += F.mse_loss(anchor_q[0], aug_q[0]) + \
+        #                F.mse_loss(anchor_q[1], aug_q[1])
+
         batch_size = c.shape[0]
         # Actions
         # ! Can set below batch size for more efficiency
         num_actions = batch_size  # Batch Size
-        action_inds = np.random.randint(0, batch_size, size=num_actions)
-        action_dist = action[action_inds]
+        action_dist = action[:num_actions]
         action_conv = action_dist.unsqueeze(0).expand(batch_size, -1, -1)
         action_conv = action_conv.reshape(batch_size * num_actions, action.shape[1])
         # Anchor and augmented

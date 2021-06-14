@@ -400,19 +400,39 @@ class CurlSacAgent(object):
         Q1_aug, Q2_aug = self.critic(obs_aug, action, detach_encoder=self.detach_encoder)
         c_aug = self.critic.outputs['c']
 
-        # Can set below batch size to increase backwards pass efficiency
-        action_dist_size = c.shape[0]
-        action_inds = np.random.randint(0, c.shape[0], size=action_dist_size)
-        action_dist = action[action_inds]
-        action_conv = action_dist.unsqueeze(0).expand(c.shape[0], -1, -1).reshape(c.shape[0] * action_dist.shape[0],
-                                                                                  action.shape[1])
-        anchor = c.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(action_conv.shape[0], c.shape[1])
-        pos = c_aug.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(anchor.shape)
-        # compute q for each
+        # # Can set below batch size to increase backwards pass efficiency
+        # action_dist_size = c.shape[0]
+        # action_inds = np.random.randint(0, c.shape[0], size=action_dist_size)
+        # action_dist = action[action_inds]
+        # action_conv = action_dist.unsqueeze(0).expand(c.shape[0], -1, -1).reshape(c.shape[0] * action_dist.shape[0],
+        #                                                                           action.shape[1])
+        # anchor = c.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(action_conv.shape[0], c.shape[1])
+        # pos = c_aug.unsqueeze(1).expand(-1, action_dist.shape[0], -1).reshape(anchor.shape)
+        # # compute q for each
+        # anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
+        # pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
+        # # TODO should this employ torch.min?
+        # critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
+
+        batch_size = c.shape[0]
+        # Actions
+        # ! Can set below batch size for more efficiency
+        num_actions = batch_size  # Batch Size
+        action_dist = action[:num_actions]
+        action_conv = action_dist.unsqueeze(0).expand(batch_size, -1, -1)
+        action_conv = action_conv.reshape(batch_size * num_actions, action.shape[1])
+        # Anchor and augmented
+        # (c is the visual encoding, c = encoder(s_t), c_aug = encoder(aug(s_t)) )
+        anchor = c.unsqueeze(1).expand(-1, num_actions, -1)
+        anchor = anchor.reshape(batch_size * num_actions, c.shape[1])
+        aug = c_aug.unsqueeze(1).expand(-1, num_actions, -1).reshape(anchor.shape)
+        # Compute Q-value distribution for each
         anchor_q = self.critic(anchor, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
-        pos_q = self.critic(pos, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
-        # TODO should this employ torch.min?
-        critic_loss += F.mse_loss(anchor_q[0], pos_q[0]) + F.mse_loss(anchor_q[1], pos_q[1])
+        aug_q = self.critic(aug, action_conv, detach_encoder=self.detach_encoder, obs_already_encoded=True)
+        # rQdia
+        # (SAC-AE uses two Q networks)
+        critic_loss += F.mse_loss(anchor_q[0], aug_q[0]) + \
+                       F.mse_loss(anchor_q[1], aug_q[1])
 
         if step % self.log_interval == 0:
             L.log('train_critic/loss', critic_loss, step)
