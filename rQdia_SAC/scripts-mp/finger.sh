@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=3 python train-mp.py\
+CUDA_VISIBLE_DEVICES=0 python train-mp.py\
     --domain_name finger \
     --task_name spin \
     --encoder_type pixel \

@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=1 python train-mp.py\
+CUDA_VISIBLE_DEVICES=2 python train-mp.py\
     --domain_name cartpole \
     --task_name swingup \
     --encoder_type pixel \

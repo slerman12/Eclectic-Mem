@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=0 python train-mp.py\
+CUDA_VISIBLE_DEVICES=2 python train-mp.py\
     --domain_name reacher \
     --task_name easy \
     --encoder_type pixel \

@@ -1,4 +1,4 @@
-CUDA_VISIBLE_DEVICES=0 python train-mp.py\
+CUDA_VISIBLE_DEVICES=1 python train-mp.py\
     --domain_name ball_in_cup \
     --task_name catch \
     --encoder_type pixel \
