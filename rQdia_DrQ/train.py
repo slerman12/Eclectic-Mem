@@ -4,7 +4,7 @@ import os
 from pathlib import Path
 import socket
 
-os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
+# os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
 # import gym
 import time
 
