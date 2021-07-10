@@ -289,7 +289,7 @@ def main(seed):
 
 if __name__ == '__main__':
     WORLDSIZE = 3
-    mp.set_start_method('spawn', force=True)
+    mp.set_start_method('fork', force=True)
     seeds = set()
     while len(seeds) != 20:
         seeds.add(np.random.randint(1, 1000000))
