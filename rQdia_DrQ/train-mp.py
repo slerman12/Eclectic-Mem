@@ -1,25 +1,22 @@
 import argparse
 import json
 import os
-from pathlib import Path
 import socket
-
 # if not os.environ.get('USER') == 'jbi5':
 #     os.environ['CLEARML_CONFIG_FILE'] = str(Path.home() / f"clearml-{socket.getfqdn()}.conf")
 # # import gym
 import time
+from pathlib import Path
 
 import dmc2gym
 import numpy as np
-
 import torch
-import torch.multiprocessing as mp
+from clearml import Task
+import exps
 import curl_utils
 from curl_sac import CurlSacAgent
 from logger import Logger
 from video import VideoRecorder
-from clearml import Task
-from pathlib import Path
 
 os.environ['LD_LIBRARY_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin:/usr/lib/nvidia-440')
 os.environ['MJLIB_PATH'] = str(Path.home() / '.mujoco/mujoco200_linux/bin/libmujoco200.so')
@@ -29,6 +26,7 @@ os.environ['MJKEY_PATH'] = str(Path.home() / f'.mujoco/mjkey_{socket.getfqdn()}.
 def parse_args():
     parser = argparse.ArgumentParser()
     # environmentK
+    parser.add_argument('--config', default='config.yaml')
     parser.add_argument('--domain_name', default='cartpole')
     parser.add_argument('--task_name', default='swingup')
     parser.add_argument('--expname', default=None)
@@ -160,16 +158,15 @@ def make_agent(obs_shape, action_shape, args, device):
         assert 'agent is not supported: %s' % args.agent
 
 
-def main(seed):
-    args = parse_args()
-    args.seed = seed
+def main(args):
     snapshots_path = Path('./experiments')
     snapshots_path.mkdir(parents=True, exist_ok=True)
-    time.sleep(np.random.randint(1, 3))
-    Task.init(project_name="Eclectic-Mem",
-              task_name=f"{args.domain_name}-{args.task_name}-{args.seed}" if not args.expname else args.expname,
-              output_uri=str(snapshots_path))
-
+    time.sleep(np.random.randint(1, 5))
+    task = Task.init(project_name="Eclectic-Mem",
+                     task_name=args.exp_name,
+                     tags=socket.getfqdn(),
+                     output_uri=str(snapshots_path))
+    time.sleep(np.random.randint(1, 5))
     if args.seed == -1:
         args.__dict__["seed"] = np.random.randint(1, 1000000)
     curl_utils.set_seed_everywhere(args.seed)
@@ -285,18 +282,13 @@ def main(seed):
 
         obs = next_obs
         episode_step += 1
+    env.close()
+    task.close()
 
 
 if __name__ == '__main__':
-    WORLDSIZE = 3
-    mp.set_start_method('fork', force=True)
-    seeds = set()
-    while len(seeds) != 20:
-        seeds.add(np.random.randint(1, 1000000))
-    with mp.Pool(WORLDSIZE) as pool:
-        pool.map(main, seeds)
-    # mp.spawn(main,
-    #          args=(WORLDSIZE,),
-    #          nprocs=WORLDSIZE,
-    #          join=True)
-    # torch.multiprocessing.spawn(main, nprocs=2, join=True)
+    args = parse_args()
+    args.config = str(Path(__file__).parent / args.config)
+    print(f'loading{args.config}')
+    ex = exps.Executor(args)
+    ex.run(main)
