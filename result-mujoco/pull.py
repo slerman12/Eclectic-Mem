@@ -53,6 +53,7 @@ for exp in exp_done:
         envs['500k'][env_name].append(reward['y'][:][-1])
 for name, exps in envs['500k'].items():
     print(f"{name:>20}->{len(exps)}")
+    json.dump(envs, open('reliable/DrQ+rQdia-backup.json', 'w'))
 smallest_len = min([len(envs['100k'][i]) for i in standard_name])
 print(f'Trim to {smallest_len}')
 envs = {step: {env: envs[step][env][:smallest_len] for env in standard_name} for step in steps}
