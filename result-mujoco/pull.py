@@ -8,7 +8,7 @@ from collections import defaultdict
 import tqdm
 from clearml import Task
 
-update = True
+update = False
 
 project = "Eclectic-Mem"
 
@@ -46,11 +46,18 @@ for exp in exp_done:
     if seed.isnumeric():
         print(env_name)
         reward = exp['result']['mean_episode_reward']
-        #
+        # take the max of the traj
         # envs['100k'][env_name].append(max(reward['y'][:reward['x'].index(100000) + 1]))
         # envs['500k'][env_name].append(max(reward['y'][:]))
-        envs['100k'][env_name].append(reward['y'][:reward['x'].index(100000) + 1][-1])
-        envs['500k'][env_name].append(reward['y'][:][-1])
+        # take the max of the traj
+        # envs['100k'][env_name].append(max(reward['y'][:reward['x'].index(100000) + 1]))
+        # envs['500k'][env_name].append(max(reward['y'][:]))
+        # take the last of the traj
+        lens = 1
+        last1kof100k = reward['y'][:reward['x'].index(100000) + 1][-1 * lens:]
+        last1kof500k = reward['y'][:][-1 * lens:]
+        envs['100k'][env_name].append(sum(last1kof100k) / len(last1kof100k))
+        envs['500k'][env_name].append(sum(last1kof500k) / len(last1kof500k))
 for name, exps in envs['500k'].items():
     print(f"{name:>20}->{len(exps)}")
     json.dump(envs, open('reliable/DrQ+rQdia-backup.json', 'w'))

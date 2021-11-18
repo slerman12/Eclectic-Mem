@@ -24,7 +24,6 @@ class Executor:
         self.tasks = []
         done = json.load(open(Path(__file__).parents[2] / 'result-mujoco' / 'reliable' / 'DrQ+rQdia-backup.json'))
         done = {name: len(exps) for name, exps in done['500k'].items()}
-        
         for config in sorted(configs, key=lambda i: done[f"{i['domain_name']}_{i['task_name']}"]):
             seeds = set()
             while len(seeds) != 4:
